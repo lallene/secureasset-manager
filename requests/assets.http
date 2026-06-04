@@ -1,9 +1,5 @@
-POST http://localhost:8080/register
-Content-Type: application/json
+### Get Technicians
+GET http://localhost:8080/technicians
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlY2huaWNpYW4xQHRlc3QuY29tIiwiZXhwIjoxNzgwNjY4NDIxLCJyb2xlIjoiVGVjaG5pY2lhbiIsInVzZXJfaWQiOjEwfQ.r_Jk34jKms5N25yG3jJi8YvLMvD1ACNpHi42AqAo7v0
 
-{
-  "name": "Cedrick",
-  "email": "cedrick@test.com",
-  "password": "password123",
-  "role": "Admin"
-}
+

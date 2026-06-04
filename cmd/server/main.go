@@ -8,6 +8,7 @@ package main
 
 import (
 	"net/http"
+	"secureasset-manager/internal/seeder"
 
 	_ "secureasset-manager/docs"
 
@@ -42,6 +43,8 @@ func main() {
 	); err != nil {
 		panic("Erreur migration : " + err.Error())
 	}
+
+	seeder.Seed()
 
 	router := gin.Default()
 
@@ -86,6 +89,13 @@ func main() {
 		auth.GetUsers,
 	)
 
+	router.GET(
+		"/technicians",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		auth.GetTechnicians,
+	)
+
 	router.POST(
 		"/assets",
 		middleware.JWTAuthMiddleware(),
@@ -103,7 +113,7 @@ func main() {
 	router.GET(
 		"/assets/:id",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		middleware.RequireRole("Admin", "Technician"),
 		asset.GetAssetByID,
 	)
 
@@ -124,7 +134,7 @@ func main() {
 	router.POST(
 		"/incidents",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Admin", "Technician"),
+		middleware.RequireRole("Viewer"),
 		incident.CreateIncident,
 	)
 
@@ -145,14 +155,14 @@ func main() {
 	router.PUT(
 		"/incidents/:id",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Admin", "Technician"),
+		middleware.RequireRole("Technician"),
 		incident.UpdateIncident,
 	)
 
 	router.DELETE(
 		"/incidents/:id",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Admin"),
+		middleware.RequireRole("Technician"),
 		incident.DeleteIncident,
 	)
 
@@ -161,6 +171,34 @@ func main() {
 		middleware.JWTAuthMiddleware(),
 		middleware.RequireRole("Admin", "Technician", "Viewer"),
 		dashboard.GetStats,
+	)
+
+	router.PUT(
+		"/incidents/:id/take",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Technician"),
+		incident.TakeIncident,
+	)
+
+	router.PUT(
+		"/incidents/:id/resolve",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Technician"),
+		incident.ResolveIncident,
+	)
+
+	router.PUT(
+		"/incidents/:id/close",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Technician"),
+		incident.CloseIncident,
+	)
+
+	router.POST(
+		"/incidents/:id/react",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Viewer"),
+		incident.ReactToIncident,
 	)
 
 	if err := router.Run(":" + cfg.AppPort); err != nil {

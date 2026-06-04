@@ -45,6 +45,25 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
+func GetTechnicians(c *gin.Context) {
+	var users []User
+
+	if err := database.DB.
+		Where("role = ?", "Technician").
+		Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible de récupérer les techniciens",
+		})
+		return
+	}
+
+	for i := range users {
+		users[i].Password = ""
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
 func GetUsers(c *gin.Context) {
 	var users []User
 

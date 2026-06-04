@@ -1,6 +1,10 @@
 package asset
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Asset struct {
 	gorm.Model
@@ -17,4 +21,9 @@ type Asset struct {
 	Status string `json:"status" binding:"required"`
 
 	AssignedTo string `json:"assigned_to"`
+
+	AssignedTechnicianID uint       `json:"assigned_technician_id"`
+	DueAt                *time.Time `json:"due_at"`
+	ResolvedAt           *time.Time `json:"resolved_at"`
+	ClosedAt             *time.Time `json:"closed_at"`
 }

@@ -3,6 +3,7 @@ package asset
 import (
 	"net/http"
 	"secureasset-manager/pkg/logger"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -73,6 +74,23 @@ func GetAssetByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, asset)
+}
+
+func calculateDueDate(priority string) time.Time {
+	now := time.Now()
+
+	switch priority {
+	case "Critical":
+		return now.Add(4 * time.Hour)
+	case "High":
+		return now.Add(8 * time.Hour)
+	case "Medium":
+		return now.Add(24 * time.Hour)
+	case "Low":
+		return now.Add(72 * time.Hour)
+	default:
+		return now.Add(24 * time.Hour)
+	}
 }
 
 func UpdateAsset(c *gin.Context) {
