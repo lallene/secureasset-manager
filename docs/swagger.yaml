@@ -1,0 +1,48 @@
+basePath: /
+definitions:
+  asset.Asset:
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API de gestion de parc informatique et incidents sécurité
+  title: SecureAsset Manager API
+  version: "1.0"
+paths:
+  /assets:
+    get:
+      description: Récupérer tous les équipements
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/asset.Asset'
+            type: array
+      summary: Liste des assets
+      tags:
+      - Assets
+    post:
+      consumes:
+      - application/json
+      description: Ajouter un équipement informatique
+      parameters:
+      - description: Asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/asset.Asset'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/asset.Asset'
+      summary: Créer un asset
+      tags:
+      - Assets
+swagger: "2.0"

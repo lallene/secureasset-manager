@@ -1,0 +1,73 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API de gestion de parc informatique et incidents sécurité",
+        "title": "SecureAsset Manager API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/assets": {
+            "get": {
+                "description": "Récupérer tous les équipements",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Liste des assets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/asset.Asset"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Ajouter un équipement informatique",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Créer un asset",
+                "parameters": [
+                    {
+                        "description": "Asset",
+                        "name": "asset",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/asset.Asset"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/asset.Asset"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "asset.Asset": {
+            "type": "object"
+        }
+    }
+}
