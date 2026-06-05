@@ -8,6 +8,7 @@ package main
 
 import (
 	"net/http"
+	"secureasset-manager/internal/notification"
 	"secureasset-manager/internal/seeder"
 
 	_ "secureasset-manager/docs"
@@ -27,6 +28,7 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
+import ws "secureasset-manager/internal/websocket"
 
 func main() {
 
@@ -40,6 +42,9 @@ func main() {
 		&asset.Asset{},
 		&incident.Incident{},
 		&auth.User{},
+		&incident.IncidentComment{},
+		&notification.Notification{},
+		&incident.IncidentAttachment{},
 	); err != nil {
 		panic("Erreur migration : " + err.Error())
 	}
@@ -155,22 +160,15 @@ func main() {
 	router.PUT(
 		"/incidents/:id",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Technician"),
+		middleware.RequireRole("Admin", "Viewer"),
 		incident.UpdateIncident,
 	)
 
 	router.DELETE(
 		"/incidents/:id",
 		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Technician"),
+		middleware.RequireRole("Admin", "Viewer"),
 		incident.DeleteIncident,
-	)
-
-	router.GET(
-		"/dashboard/stats",
-		middleware.JWTAuthMiddleware(),
-		middleware.RequireRole("Admin", "Technician", "Viewer"),
-		dashboard.GetStats,
 	)
 
 	router.PUT(
@@ -194,12 +192,77 @@ func main() {
 		incident.CloseIncident,
 	)
 
+	router.GET(
+		"/dashboard/stats",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		dashboard.GetStats,
+	)
+
 	router.POST(
 		"/incidents/:id/react",
 		middleware.JWTAuthMiddleware(),
 		middleware.RequireRole("Viewer"),
 		incident.ReactToIncident,
 	)
+
+	router.GET(
+		"/incidents/:id/comments",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		incident.GetIncidentComments,
+	)
+
+	router.POST(
+		"/incidents/:id/comments",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Technician", "Viewer"),
+		incident.AddIncidentComment,
+	)
+
+	router.GET(
+		"/notifications",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		notification.GetNotifications,
+	)
+
+	router.PUT(
+		"/notifications/:id/read",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		notification.MarkAsRead,
+	)
+
+	router.POST(
+		"/incidents/:id/attachments",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Technician", "Viewer"),
+		incident.UploadIncidentAttachment,
+	)
+
+	router.GET(
+		"/incidents/:id/attachments",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		incident.GetIncidentAttachments,
+	)
+
+	router.GET(
+		"/attachments/:id/download",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		incident.DownloadIncidentAttachment,
+	)
+
+	router.DELETE(
+		"/attachments/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Technician", "Viewer"),
+		incident.DeleteIncidentAttachment,
+	)
+
+	router.GET("/ws", ws.HandleWS)
 
 	if err := router.Run(":" + cfg.AppPort); err != nil {
 		panic("Erreur démarrage serveur : " + err.Error())

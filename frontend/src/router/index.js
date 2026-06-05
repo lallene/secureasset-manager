@@ -5,6 +5,7 @@ import DashboardView from "../views/DashboardView.vue";
 import AssetsView from "../views/AssetsView.vue";
 import IncidentsView from "../views/IncidentsView.vue";
 import UsersView from "../views/UsersView.vue";
+import NotificationsView from "../views/NotificationsView.vue";
 
 const routes = [
     { path: "/", component: LoginView },
@@ -12,6 +13,7 @@ const routes = [
     { path: "/assets", component: AssetsView },
     { path: "/incidents", component: IncidentsView },
     { path: "/users", component: UsersView },
+    { path: "/notifications", component: NotificationsView },
 ];
 
 const router = createRouter({

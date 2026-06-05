@@ -1,5 +1,2 @@
-### Get Technicians
-GET http://localhost:8080/technicians
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlY2huaWNpYW4xQHRlc3QuY29tIiwiZXhwIjoxNzgwNjY4NDIxLCJyb2xlIjoiVGVjaG5pY2lhbiIsInVzZXJfaWQiOjEwfQ.r_Jk34jKms5N25yG3jJi8YvLMvD1ACNpHi42AqAo7v0
-
-
+GET http://localhost:8080/incidents/1/attachments
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InZpZXdlckB0ZXN0LmNvbSIsImV4cCI6MTc4MDc1NzY2OCwicm9sZSI6IlZpZXdlciIsInVzZXJfaWQiOjR9.aPP0ylFU92BVV_iwg3whgyG7T0A-mJXeGkSLD4SVi1M

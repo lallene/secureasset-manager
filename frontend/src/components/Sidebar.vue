@@ -1,12 +1,37 @@
 <script setup>
 import { ref, onMounted } from "vue";
+import api from "../api/axios";
+import { connectWebSocket } from "../services/websocket";
 
 const name = ref("");
 const role = ref("");
+const unreadNotifications = ref(0);
+
+const fetchNotificationsCount = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await api.get("/notifications", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    unreadNotifications.value =
+      response.data.filter((n) => !n.is_read).length;
+  } catch (err) {
+    console.error(err);
+  }
+};
 
 onMounted(() => {
   name.value = localStorage.getItem("name") || "";
   role.value = localStorage.getItem("role") || "";
+
+  fetchNotificationsCount();
+  connectWebSocket(() => {
+    fetchNotificationsCount();
+  });
 });
 
 const logout = () => {
@@ -23,6 +48,21 @@ const logout = () => {
       </h1>
 
       <nav class="flex flex-col gap-4">
+
+       <router-link
+         to="/notifications"
+         class="flex items-center justify-between"
+       >
+         <span>Notifications</span>
+
+         <span
+           v-if="unreadNotifications > 0"
+           class="bg-red-600 text-white text-xs px-2 py-1 rounded-full"
+         >
+           {{ unreadNotifications }}
+         </span>
+       </router-link>
+
         <router-link to="/dashboard" class="hover:text-blue-400">
           Dashboard
         </router-link>

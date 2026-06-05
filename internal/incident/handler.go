@@ -1,7 +1,13 @@
 package incident
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"secureasset-manager/internal/auth"
+	"secureasset-manager/internal/notification"
+	ws "secureasset-manager/internal/websocket"
 	"time"
 
 	"secureasset-manager/internal/database"
@@ -50,6 +56,23 @@ func CreateIncident(c *gin.Context) {
 	if err := database.DB.Create(&incident).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de créer l'incident"})
 		return
+	}
+
+	var technicians []auth.User
+
+	database.DB.
+		Where("role = ?", "Technician").
+		Find(&technicians)
+
+	ws.Broadcast("Nouveau ticket : " + incident.Title)
+
+	for _, tech := range technicians {
+		notification.CreateNotification(
+			tech.ID,
+			"Nouveau ticket",
+			incident.Title,
+			&incident.ID,
+		)
 	}
 
 	c.JSON(http.StatusCreated, incident)
@@ -106,11 +129,38 @@ func UpdateIncident(c *gin.Context) {
 		return
 	}
 
+	role, _ := c.Get("role")
+	userID, _ := c.Get("user_id")
+
+	if role == "Viewer" {
+		if idFloat, ok := userID.(float64); ok {
+			if incident.CreatedByID != uint(idFloat) {
+				c.JSON(http.StatusForbidden, gin.H{
+					"error": "Vous ne pouvez modifier que vos propres tickets",
+				})
+				return
+			}
+		}
+	}
+
 	if err := c.ShouldBindJSON(&incident); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible de modifier un ticket clôturé",
+		})
+		return
+	}
+
+	if role == "Viewer" {
+		incident.Status = "Open"
+		incident.ResolvedAt = nil
+		incident.ClosedAt = nil
 	}
 
 	if err := database.DB.Save(&incident).Error; err != nil {
@@ -131,6 +181,27 @@ func DeleteIncident(c *gin.Context) {
 	if err := database.DB.First(&incident, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Incident introuvable",
+		})
+		return
+	}
+
+	role, _ := c.Get("role")
+	userID, _ := c.Get("user_id")
+
+	if role == "Viewer" {
+		if idFloat, ok := userID.(float64); ok {
+			if incident.CreatedByID != uint(idFloat) {
+				c.JSON(http.StatusForbidden, gin.H{
+					"error": "Vous ne pouvez supprimer que vos propres tickets",
+				})
+				return
+			}
+		}
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible de supprimer un ticket clôturé",
 		})
 		return
 	}
@@ -182,6 +253,20 @@ func TakeIncident(c *gin.Context) {
 		return
 	}
 
+	notification.CreateNotification(
+		incident.CreatedByID,
+		"Ticket pris en charge",
+		"Votre ticket '"+incident.Title+"' est maintenant en cours de traitement.",
+		&incident.ID,
+	)
+
+	database.DB.Create(&IncidentComment{
+		IncidentID: incident.ID,
+		UserID:     incident.AssignedTechnicianID,
+		Message:    "Ticket pris en charge",
+		Type:       "system",
+	})
+
 	c.JSON(http.StatusOK, incident)
 }
 
@@ -211,6 +296,29 @@ func ResolveIncident(c *gin.Context) {
 		return
 	}
 
+	notification.CreateNotification(
+		incident.CreatedByID,
+		"Ticket résolu",
+		"Votre ticket '"+incident.Title+"' a été résolu.",
+		&incident.ID,
+	)
+
+	userID, _ := c.Get("user_id")
+
+	comment := IncidentComment{
+		IncidentID: incident.ID,
+		Message:    "Ticket résolu",
+		Type:       "system",
+	}
+
+	if idFloat, ok := userID.(float64); ok {
+		comment.UserID = uint(idFloat)
+	}
+
+	database.DB.Create(&comment)
+
+	ws.Broadcast("Ticket résolu : " + incident.Title)
+
 	c.JSON(http.StatusOK, incident)
 }
 
@@ -239,6 +347,29 @@ func CloseIncident(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de clôturer le ticket"})
 		return
 	}
+
+	notification.CreateNotification(
+		incident.CreatedByID,
+		"Ticket clôturé",
+		"Votre ticket '"+incident.Title+"' a été clôturé.",
+		&incident.ID,
+	)
+
+	userID, _ := c.Get("user_id")
+
+	comment := IncidentComment{
+		IncidentID: incident.ID,
+		Message:    "Ticket clôturé",
+		Type:       "system",
+	}
+
+	if idFloat, ok := userID.(float64); ok {
+		comment.UserID = uint(idFloat)
+	}
+
+	database.DB.Create(&comment)
+
+	ws.Broadcast("Ticket clôturé : " + incident.Title)
 
 	c.JSON(http.StatusOK, incident)
 }
@@ -283,5 +414,237 @@ func ReactToIncident(c *gin.Context) {
 		"message":  "Réaction ajoutée, ticket rouvert",
 		"reaction": input.Message,
 		"incident": incident,
+	})
+}
+
+type CommentInput struct {
+	Message string `json:"message" binding:"required"`
+}
+
+func AddIncidentComment(c *gin.Context) {
+	id := c.Param("id")
+
+	var input CommentInput
+	var incident Incident
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := database.DB.First(&incident, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
+		return
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible de commenter un ticket clôturé",
+		})
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+	role, _ := c.Get("role")
+
+	comment := IncidentComment{
+		IncidentID: incident.ID,
+		Message:    input.Message,
+		Type:       "comment",
+	}
+
+	if idFloat, ok := userID.(float64); ok {
+		comment.UserID = uint(idFloat)
+	}
+
+	if err := database.DB.Create(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible d'ajouter le commentaire",
+		})
+		return
+	}
+
+	ws.Broadcast("Nouveau commentaire sur : " + incident.Title)
+
+	if role == "Viewer" {
+		if incident.AssignedTechnicianID > 0 {
+			notification.CreateNotification(
+				incident.AssignedTechnicianID,
+				"Nouveau commentaire sur '"+incident.Title+"'",
+				input.Message,
+				&incident.ID,
+			)
+		}
+	}
+
+	if role == "Technician" {
+		notification.CreateNotification(
+			incident.CreatedByID,
+			"Nouveau commentaire",
+			input.Message,
+			&incident.ID,
+		)
+	}
+
+	c.JSON(http.StatusCreated, comment)
+}
+
+func GetIncidentComments(c *gin.Context) {
+	id := c.Param("id")
+
+	var comments []IncidentComment
+
+	if err := database.DB.
+		Preload("User").
+		Where("incident_id = ?", id).
+		Order("created_at ASC").
+		Find(&comments).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible de récupérer les commentaires",
+		})
+		return
+	}
+
+	for i := range comments {
+		comments[i].User.Password = ""
+	}
+
+	c.JSON(http.StatusOK, comments)
+}
+
+func UploadIncidentAttachment(c *gin.Context) {
+	id := c.Param("id")
+
+	var incident Incident
+
+	if err := database.DB.First(&incident, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
+		return
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible d'ajouter une pièce jointe sur un ticket clôturé",
+		})
+		return
+	}
+
+	file, err := c.FormFile("file")
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Fichier manquant",
+		})
+		return
+	}
+
+	uploadDir := "uploads/incidents"
+
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible de créer le dossier upload",
+		})
+		return
+	}
+
+	fileName := fmt.Sprintf(
+		"incident_%s_%s",
+		id,
+		file.Filename,
+	)
+
+	filePath := filepath.Join(uploadDir, fileName)
+
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible d'enregistrer le fichier",
+		})
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+
+	attachment := IncidentAttachment{
+		IncidentID: incident.ID,
+		FileName:   file.Filename,
+		FilePath:   filePath,
+		FileSize:   file.Size,
+	}
+
+	if idFloat, ok := userID.(float64); ok {
+		attachment.UploadedBy = uint(idFloat)
+	}
+
+	if err := database.DB.Create(&attachment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible d'enregistrer la pièce jointe",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, attachment)
+}
+
+func GetIncidentAttachments(c *gin.Context) {
+	id := c.Param("id")
+
+	var attachments []IncidentAttachment
+
+	if err := database.DB.
+		Preload("User").
+		Where("incident_id = ?", id).
+		Order("created_at DESC").
+		Find(&attachments).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible de récupérer les pièces jointes",
+		})
+		return
+	}
+
+	for i := range attachments {
+		attachments[i].User.Password = ""
+	}
+
+	c.JSON(http.StatusOK, attachments)
+}
+
+func DownloadIncidentAttachment(c *gin.Context) {
+	id := c.Param("id")
+
+	var attachment IncidentAttachment
+
+	if err := database.DB.First(&attachment, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Pièce jointe introuvable",
+		})
+		return
+	}
+
+	c.FileAttachment(attachment.FilePath, attachment.FileName)
+}
+
+func DeleteIncidentAttachment(c *gin.Context) {
+	id := c.Param("id")
+
+	var attachment IncidentAttachment
+
+	if err := database.DB.First(&attachment, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Pièce jointe introuvable",
+		})
+		return
+	}
+
+	_ = os.Remove(attachment.FilePath)
+
+	if err := database.DB.Delete(&attachment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Impossible de supprimer la pièce jointe",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Pièce jointe supprimée",
 	})
 }

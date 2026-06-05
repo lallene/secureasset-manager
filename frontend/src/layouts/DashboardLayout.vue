@@ -4,13 +4,13 @@ import Navbar from "../components/Navbar.vue";
 </script>
 
 <template>
-  <div class="flex bg-slate-100">
+  <div class="flex h-screen bg-slate-100 overflow-hidden">
     <Sidebar />
 
-    <div class="flex-1">
+    <div class="flex-1 flex flex-col overflow-hidden">
       <Navbar />
 
-      <main class="p-6">
+      <main class="flex-1 overflow-y-auto p-6">
         <slot />
       </main>
     </div>
