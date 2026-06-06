@@ -109,6 +109,69 @@ const logout = () => {
             {{ unreadNotifications }}
           </span>
         </router-link>
+
+        <div
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            class="px-3 pt-4 pb-2 text-[11px] uppercase tracking-wider text-slate-600 font-semibold"
+        >
+          CMDB
+        </div>
+
+        <router-link
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            to="/cmdb/applications"
+            active-class="bg-slate-900 text-white font-medium"
+            class="flex items-center gap-3 text-slate-400 hover:text-slate-100 hover:bg-slate-900/50 px-3 py-2.5 rounded-xl transition-all duration-150 group"
+        >
+          <svg class="w-4 h-4 text-slate-400 group-hover:text-slate-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5h10.5M6.75 12h10.5m-10.5 4.5h10.5M4.5 4.5h15A1.5 1.5 0 0121 6v12a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18V6a1.5 1.5 0 011.5-1.5z" />
+          </svg>
+          <span class="text-sm">Applications</span>
+        </router-link>
+        <router-link
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            to="/cmdb/databases"
+            active-class="bg-slate-900 text-white font-medium"
+            class="flex items-center gap-3 text-slate-400 hover:text-slate-100 hover:bg-slate-900/50 px-3 py-2.5 rounded-xl transition-all duration-150 group"
+        >
+          <svg
+              class="w-4 h-4 text-slate-400 group-hover:text-slate-200 transition-colors"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.75"
+              stroke="currentColor"
+          >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 6.75C3.75 5.507 7.444 4.5 12 4.5s8.25 1.007 8.25 2.25S16.556 9 12 9 3.75 7.993 3.75 6.75z"
+            />
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 6.75v5.25C3.75 13.243 7.444 14.25 12 14.25s8.25-1.007 8.25-2.25V6.75"
+            />
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 12v5.25c0 1.243 3.694 2.25 8.25 2.25s8.25-1.007 8.25-2.25V12"
+            />
+          </svg>
+
+          <span class="text-sm">Bases de données</span>
+        </router-link>
+        <router-link
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            to="/cmdb/relations"
+            active-class="bg-slate-900 text-white font-medium"
+            class="flex items-center gap-3 text-slate-400 hover:text-slate-100 hover:bg-slate-900/50 px-3 py-2.5 rounded-xl transition-all duration-150 group"
+        >
+          <svg class="w-4 h-4 text-slate-400 group-hover:text-slate-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5h.008v.008H7.5V7.5zm9 9h.008v.008H16.5V16.5zM8.25 8.25l7.5 7.5m.75-8.25a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-9 9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+          <span class="text-sm">Relations</span>
+        </router-link>
+
         <div
             v-if="role === 'Admin'"
             class="px-3 pt-4 pb-2 text-[11px] uppercase tracking-wider text-slate-600 font-semibold"

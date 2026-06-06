@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"secureasset-manager/internal/cmdb"
 
 	_ "secureasset-manager/docs"
 
@@ -40,6 +41,9 @@ func main() {
 		&incident.IncidentComment{},
 		&incident.IncidentAttachment{},
 		&notification.Notification{},
+		&cmdb.Application{},
+		&cmdb.Database{},
+		&cmdb.ConfigurationRelation{},
 	); err != nil {
 		panic("Erreur migration : " + err.Error())
 	}
@@ -294,6 +298,89 @@ func main() {
 		middleware.JWTAuthMiddleware(),
 		middleware.RequireRole("Admin"),
 		service.DeleteService,
+	)
+
+	router.GET(
+		"/cmdb/applications",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetApplications,
+	)
+
+	router.GET(
+		"/cmdb/applications/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetApplicationByID,
+	)
+
+	router.POST(
+		"/cmdb/applications",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.CreateApplication,
+	)
+
+	router.PUT(
+		"/cmdb/applications/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.UpdateApplication,
+	)
+
+	router.DELETE(
+		"/cmdb/applications/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.DeleteApplication,
+	)
+
+	router.GET("/cmdb/databases",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetDatabases,
+	)
+
+	router.POST("/cmdb/databases",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.CreateDatabase,
+	)
+
+	router.PUT("/cmdb/databases/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.UpdateDatabase,
+	)
+
+	router.DELETE("/cmdb/databases/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.DeleteDatabase,
+	)
+
+	router.GET("/cmdb/relations",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetRelations,
+	)
+
+	router.POST("/cmdb/relations",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.CreateRelation,
+	)
+
+	router.PUT("/cmdb/relations/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.UpdateRelation,
+	)
+
+	router.DELETE("/cmdb/relations/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.DeleteRelation,
 	)
 
 	router.GET("/ws", ws.HandleWS)

@@ -8,6 +8,13 @@ import UsersView from "../views/UsersView.vue";
 import NotificationsView from "../views/NotificationsView.vue";
 import SitesView from "../views/SitesView.vue";
 import ServicesView from "../views/ServicesView.vue";
+import ApplicationsView from "../views/ApplicationsView.vue";
+import DatabasesView from "../views/DatabasesView.vue";
+import RelationsView from "../views/RelationsView.vue";
+
+
+
+
 
 const routes = [
     { path: "/", component: LoginView },
@@ -18,6 +25,9 @@ const routes = [
     { path: "/sites", component: SitesView },
     { path: "/services", component: ServicesView },
     { path: "/notifications", component: NotificationsView },
+    { path: "/cmdb/applications", component: ApplicationsView },
+    { path: "/cmdb/databases", component: DatabasesView },
+    { path: "/cmdb/relations", component: RelationsView },
 ];
 
 const router = createRouter({

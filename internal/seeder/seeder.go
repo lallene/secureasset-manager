@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"secureasset-manager/internal/asset"
+	"secureasset-manager/internal/cmdb"
 	"time"
 
 	"secureasset-manager/internal/auth"
@@ -121,6 +122,111 @@ func Seed() {
 	}
 
 	database.DB.CreateInBatches(&assets, 500)
+	// CMDB - Applications
+	applications := []cmdb.Application{
+		{
+			Name:        "SecureAsset Manager",
+			Description: "Plateforme ITSM interne de gestion des assets et incidents",
+			Version:     "1.0.0",
+			Criticality: "High",
+			Status:      "Active",
+			SiteID:      1,
+		},
+		{
+			Name:        "Portail RH",
+			Description: "Application de gestion des demandes RH",
+			Version:     "2.3.1",
+			Criticality: "Medium",
+			Status:      "Active",
+			SiteID:      1,
+		},
+		{
+			Name:        "CRM Support",
+			Description: "Application utilisée par les équipes support client",
+			Version:     "4.8.0",
+			Criticality: "Critical",
+			Status:      "Active",
+			SiteID:      2,
+		},
+		{
+			Name:        "Monitoring Infra",
+			Description: "Supervision des serveurs et équipements réseau",
+			Version:     "3.1.5",
+			Criticality: "Critical",
+			Status:      "Active",
+			SiteID:      5,
+		},
+	}
+
+	database.DB.Create(&applications)
+
+	// CMDB - Databases
+	databases := []cmdb.Database{
+		{
+			Name:        "secureasset_prod",
+			Engine:      "PostgreSQL",
+			Version:     "16",
+			Environment: "Production",
+			SiteID:      5,
+		},
+		{
+			Name:        "rh_prod",
+			Engine:      "MySQL",
+			Version:     "8.0",
+			Environment: "Production",
+			SiteID:      1,
+		},
+		{
+			Name:        "crm_support_prod",
+			Engine:      "PostgreSQL",
+			Version:     "15",
+			Environment: "Production",
+			SiteID:      2,
+		},
+	}
+
+	database.DB.Create(&databases)
+
+	// CMDB - Relations
+	relations := []cmdb.ConfigurationRelation{
+		{
+			SourceType:   "Application",
+			SourceID:     1,
+			TargetType:   "Asset",
+			TargetID:     1,
+			RelationType: "hosted_on",
+		},
+		{
+			SourceType:   "Application",
+			SourceID:     1,
+			TargetType:   "Database",
+			TargetID:     1,
+			RelationType: "uses_database",
+		},
+		{
+			SourceType:   "Application",
+			SourceID:     2,
+			TargetType:   "Database",
+			TargetID:     2,
+			RelationType: "uses_database",
+		},
+		{
+			SourceType:   "Application",
+			SourceID:     3,
+			TargetType:   "Database",
+			TargetID:     3,
+			RelationType: "uses_database",
+		},
+		{
+			SourceType:   "Application",
+			SourceID:     4,
+			TargetType:   "Asset",
+			TargetID:     10,
+			RelationType: "hosted_on",
+		},
+	}
+
+	database.DB.Create(&relations)
 
 	incidentTypes := []string{"Software", "Hardware", "Network", "Security", "Infrastructure"}
 	priorities := []string{"Low", "Medium", "High", "Critical"}
@@ -190,7 +296,7 @@ func Seed() {
 
 	database.DB.CreateInBatches(&incidents, 500)
 
-	log.Println("Seeder terminé : 5 sites, 5 services, 72 users, 500 assets, 10000 incidents")
+	log.Println("Seeder terminé : 5 sites, 5 services, 72 users, 500 assets, 4 applications, 3 databases, 5 relations CMDB, 10000 incidents")
 }
 
 func calculateSeedDueDateFromCreatedAt(priority string, createdAt time.Time) time.Time {
