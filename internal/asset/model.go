@@ -1,6 +1,7 @@
 package asset
 
 import (
+	"secureasset-manager/internal/site"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,7 +17,8 @@ type Asset struct {
 
 	IPAddress string `json:"ip_address" binding:"required,ip"`
 
-	Site string `json:"site" binding:"required"`
+	SiteID uint      `json:"site_id"`
+	Site   site.Site `json:"site"`
 
 	Status string `json:"status" binding:"required"`
 

@@ -23,7 +23,9 @@ func (r *Repository) Create(asset *Asset) error {
 func (r *Repository) FindAll() ([]Asset, error) {
 	var assets []Asset
 
-	err := database.DB.Find(&assets).Error
+	err := database.DB.
+		Preload("Site").
+		Find(&assets).Error
 
 	return assets, err
 }
@@ -31,7 +33,9 @@ func (r *Repository) FindAll() ([]Asset, error) {
 func (r *Repository) FindByID(id string) (*Asset, error) {
 	var asset Asset
 
-	err := database.DB.First(&asset, id).Error
+	err := database.DB.
+		Preload("Site").
+		First(&asset, id).Error
 
 	return &asset, err
 }

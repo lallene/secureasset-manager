@@ -1,0 +1,208 @@
+
+<h2 class="sr-only">Tableau de bord ITSM — métriques, tendances et analyse des incidents</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+.db{padding:0 0 1rem;}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;padding:1.25rem 0 1rem;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:1.25rem;}
+.topbar h1{font-size:17px;font-weight:500;color:var(--color-text-primary);letter-spacing:-.3px;}
+.topbar p{font-size:12px;color:var(--color-text-secondary);margin-top:2px;}
+.badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.badge{font-size:10px;font-weight:500;padding:3px 9px;border-radius:100px;border:0.5px solid;}
+.b-red{background:#FCEBEB;color:#A32D2D;border-color:#F09595;}
+.b-amber{background:#FAEEDA;color:#854F0B;border-color:#FAC775;}
+.b-blue{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4;}
+.b-green{background:#EAF3DE;color:#3B6D11;border-color:#C0DD97;}
+.sec{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-tertiary);margin:1.25rem 0 .6rem;}
+.krow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:1.25rem;}
+.kc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;}
+.kc-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:5px;}
+.kc-val{font-size:26px;font-weight:500;color:var(--color-text-primary);letter-spacing:-1px;line-height:1;}
+.kc-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:4px;}
+.kc-bar{height:2px;background:var(--color-border-tertiary);border-radius:2px;margin-top:8px;overflow:hidden;}
+.kc-fill{height:100%;border-radius:2px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
+.g1{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 16px;}
+.card h3{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:2px;}
+.card p{font-size:11px;color:var(--color-text-secondary);margin-bottom:10px;}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary);}
+.ld{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.srow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:1.25rem;}
+.sc{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:11px 13px;position:relative;overflow:hidden;}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.sc.or::before{background:#D85A30;}.sc.in::before{background:#534AB7;}.sc.em::before{background:#1D9E75;}.sc.sl::before{background:#888780;}.sc.rs::before{background:#A32D2D;}
+.sc-l{font-size:11px;color:var(--color-text-secondary);margin-bottom:6px;}
+.sc-v{font-size:26px;font-weight:500;color:var(--color-text-primary);letter-spacing:-1px;line-height:1;}
+.tag{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:100px;margin-top:6px;}
+.t-or{background:#FAECE7;color:#993C1D;}.t-in{background:#EEEDFE;color:#3C3489;}.t-em{background:#EAF3DE;color:#3B6D11;}.t-sl{background:#F1EFE8;color:#5F5E5A;}.t-rs{background:#FCEBEB;color:#A32D2D;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.pulse{animation:pulse 1.8s infinite;}
+.sla-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem;}
+.sla-c{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;}
+.sla-l{font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;}
+.sla-v{font-size:20px;font-weight:500;color:var(--color-text-primary);}
+.sla-d{font-size:11px;color:var(--color-text-tertiary);margin-top:3px;}
+.sla-bar{height:4px;background:var(--color-border-tertiary);border-radius:2px;margin-top:7px;overflow:hidden;}
+.sla-fill{height:100%;border-radius:2px;}
+.sla-ok{background:#1D9E75;}.sla-warn{background:#EF9F27;}.sla-bad{background:#E24B4A;}
+</style>
+
+<div class="db">
+
+<div class="topbar">
+  <div>
+    <h1><i class="ti ti-layout-dashboard" aria-hidden="true" style="font-size:16px;margin-right:6px;vertical-align:-2px;"></i>Tableau de bord opérationnel ITSM</h1>
+    <p>Infrastructure &amp; incidents · Semaine 23 · Mis à jour aujourd'hui à 14:32</p>
+  </div>
+  <div class="badges">
+    <span class="badge b-red pulse"><i class="ti ti-alert-circle" aria-hidden="true" style="font-size:11px;margin-right:3px;vertical-align:-1px;"></i>3 critiques</span>
+    <span class="badge b-amber">5 hors SLA</span>
+    <span class="badge b-blue">12 notifications</span>
+    <span class="badge b-green">82% SLA</span>
+  </div>
+</div>
+
+<div class="sec">Infrastructure</div>
+<div class="krow">
+  <div class="kc"><div class="kc-lbl">Total assets</div><div class="kc-val">142</div><div class="kc-sub">↑ 4 ce mois</div><div class="kc-bar"><div class="kc-fill" style="width:100%;background:#378ADD;"></div></div></div>
+  <div class="kc"><div class="kc-lbl">Actifs</div><div class="kc-val">118</div><div class="kc-sub">83% du parc</div><div class="kc-bar"><div class="kc-fill" style="width:83%;background:#1D9E75;"></div></div></div>
+  <div class="kc"><div class="kc-lbl">En alerte</div><div class="kc-val">9</div><div class="kc-sub">6% du parc</div><div class="kc-bar"><div class="kc-fill" style="width:6%;background:#EF9F27;"></div></div></div>
+  <div class="kc"><div class="kc-lbl">Hors ligne</div><div class="kc-val">15</div><div class="kc-sub">11% du parc</div><div class="kc-bar"><div class="kc-fill" style="width:11%;background:#E24B4A;"></div></div></div>
+  <div class="kc"><div class="kc-lbl">Total incidents</div><div class="kc-val">284</div><div class="kc-sub">↑ 12 cette semaine</div><div class="kc-bar"><div class="kc-fill" style="width:100%;background:#7F77DD;"></div></div></div>
+</div>
+
+<div class="sec">Statuts des incidents</div>
+<div class="srow">
+  <div class="sc or"><div class="sc-l">Ouverts</div><div class="sc-v">47</div><span class="tag t-or">À traiter</span></div>
+  <div class="sc in"><div class="sc-l">En cours</div><div class="sc-v">38</div><span class="tag t-in">Assignés</span></div>
+  <div class="sc em"><div class="sc-l">Résolus</div><div class="sc-v">156</div><span class="tag t-em">À valider</span></div>
+  <div class="sc sl"><div class="sc-l">Clôturés</div><div class="sc-v">43</div><span class="tag t-sl">Archivés</span></div>
+  <div class="sc rs"><div class="sc-l">Hors SLA</div><div class="sc-v">5</div><span class="tag t-rs pulse">En retard</span></div>
+</div>
+
+<div class="sec">Analyse graphique</div>
+
+<div class="g2">
+  <div class="card">
+    <h3>Tendance hebdomadaire — incidents ouverts</h3>
+    <p>7 derniers jours · nouveaux tickets par jour</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#534AB7;"></span>Ouverts</span>
+      <span class="li"><span class="ld" style="background:#1D9E75;"></span>Résolus</span>
+    </div>
+    <div style="position:relative;height:170px;"><canvas id="c1" role="img" aria-label="Courbe tendance incidents ouverts et résolus sur 7 jours">Ouverts: 12,9,14,11,8,15,7. Résolus: 8,11,9,13,12,10,14.</canvas></div>
+  </div>
+  <div class="card">
+    <h3>Répartition par statut</h3>
+    <p>Distribution actuelle des 284 incidents</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#D85A30;"></span>Ouverts 47</span>
+      <span class="li"><span class="ld" style="background:#534AB7;"></span>En cours 38</span>
+      <span class="li"><span class="ld" style="background:#1D9E75;"></span>Résolus 156</span>
+      <span class="li"><span class="ld" style="background:#888780;"></span>Clôturés 43</span>
+    </div>
+    <div style="position:relative;height:170px;"><canvas id="c2" role="img" aria-label="Donut statuts: 47 ouverts, 38 en cours, 156 résolus, 43 clôturés">47 ouverts, 38 en cours, 156 résolus, 43 clôturés.</canvas></div>
+  </div>
+</div>
+
+<div class="g2">
+  <div class="card">
+    <h3>Volume mensuel — 6 derniers mois</h3>
+    <p>Incidents créés vs résolus par mois</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#378ADD;"></span>Créés</span>
+      <span class="li"><span class="ld" style="background:#1D9E75;"></span>Résolus</span>
+    </div>
+    <div style="position:relative;height:170px;"><canvas id="c3" role="img" aria-label="Barres groupées incidents créés vs résolus sur 6 mois">Jan 42/38, Fév 55/49, Mar 48/51, Avr 61/55, Mai 58/60, Jun 47/38.</canvas></div>
+  </div>
+  <div class="card">
+    <h3>Priorité des incidents actifs</h3>
+    <p>Répartition des 85 incidents non clôturés</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#888780;"></span>Faible 82</span>
+      <span class="li"><span class="ld" style="background:#378ADD;"></span>Moyenne 91</span>
+      <span class="li"><span class="ld" style="background:#EF9F27;"></span>Haute 55</span>
+      <span class="li"><span class="ld" style="background:#E24B4A;"></span>Critique 3</span>
+    </div>
+    <div style="position:relative;height:170px;"><canvas id="c4" role="img" aria-label="Barres horizontales priorité incidents: 82 faibles, 91 moyens, 55 hauts, 3 critiques">82 faibles, 91 moyens, 55 hauts, 3 critiques.</canvas></div>
+  </div>
+</div>
+
+<div class="g3">
+  <div class="card">
+    <h3>MTTR par priorité</h3>
+    <p>Temps moyen de résolution (heures)</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#E24B4A;"></span>Critique</span>
+      <span class="li"><span class="ld" style="background:#EF9F27;"></span>Haute</span>
+      <span class="li"><span class="ld" style="background:#378ADD;"></span>Moyenne</span>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="c5" role="img" aria-label="Barres MTTR par priorité en heures: Critique 1.5h, Haute 4.2h, Moyenne 12h, Faible 48h">Critique 1.5h, Haute 4.2h, Moyenne 12h, Faible 48h.</canvas></div>
+  </div>
+  <div class="card">
+    <h3>Incidents par catégorie</h3>
+    <p>Nature des tickets ce mois</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#534AB7;"></span>Réseau</span>
+      <span class="li"><span class="ld" style="background:#378ADD;"></span>Serveur</span>
+      <span class="li"><span class="ld" style="background:#1D9E75;"></span>Appli</span>
+      <span class="li"><span class="ld" style="background:#EF9F27;"></span>Sécurité</span>
+      <span class="li"><span class="ld" style="background:#888780;"></span>Autre</span>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="c6" role="img" aria-label="Donut catégories: Réseau 34, Serveur 52, Appli 78, Sécurité 19, Autre 18">Réseau 34, Serveur 52, Appli 78, Sécurité 19, Autre 18.</canvas></div>
+  </div>
+  <div class="card">
+    <h3>Charge par équipe</h3>
+    <p>Incidents assignés par équipe</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#D85A30;"></span>Ouverts</span>
+      <span class="li"><span class="ld" style="background:#534AB7;"></span>En cours</span>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="c7" role="img" aria-label="Barres empilées charge par équipe: Infra, NetOps, AppDev, SecOps">Infra 12/8, NetOps 9/6, AppDev 18/15, SecOps 8/9.</canvas></div>
+  </div>
+</div>
+
+<div class="g1">
+  <div class="card">
+    <h3>Évolution SLA hebdomadaire — 12 dernières semaines</h3>
+    <p>Taux de respect SLA (%) · Objectif 95%</p>
+    <div class="leg">
+      <span class="li"><span class="ld" style="background:#378ADD;"></span>Taux SLA réel</span>
+      <span class="li"><span class="ld" style="background:#E24B4A; border:none; width:16px; height:2px; border-radius:0;"></span>Objectif 95%</span>
+    </div>
+    <div style="position:relative;height:160px;"><canvas id="c8" role="img" aria-label="Courbe SLA sur 12 semaines vs objectif 95%">S12 88, S13 91, S14 94, S15 96, S16 93, S17 89, S18 92, S19 95, S20 97, S21 90, S22 88, S23 82.</canvas></div>
+  </div>
+</div>
+
+<div class="sec">Performance SLA</div>
+<div class="sla-grid">
+  <div class="sla-c"><div class="sla-l">Taux résolution SLA</div><div class="sla-v">82%</div><div class="sla-bar"><div class="sla-fill sla-warn" style="width:82%;"></div></div><div class="sla-d">↓ 6 pts · Objectif 95%</div></div>
+  <div class="sla-c"><div class="sla-l">MTTR moyen</div><div class="sla-v">4h 12m</div><div class="sla-bar"><div class="sla-fill sla-warn" style="width:60%;"></div></div><div class="sla-d">+23m vs sem. passée · Cible 3h</div></div>
+  <div class="sla-c"><div class="sla-l">Taux réouverture</div><div class="sla-v">3.1%</div><div class="sla-bar"><div class="sla-fill sla-ok" style="width:97%;"></div></div><div class="sla-d">Dans l'objectif &lt; 5%</div></div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const T={color:'#888780',grid:'rgba(128,128,120,0.08)',font:{size:10}};
+const baseOpts=(extra={})=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},layout:{padding:{top:4,bottom:4}},...extra});
+
+new Chart(document.getElementById('c1'),{type:'line',data:{labels:['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],datasets:[{label:'Ouverts',data:[12,9,14,11,8,15,7],borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,.08)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#534AB7',borderWidth:2,borderDash:[]},{label:'Résolus',data:[8,11,9,13,12,10,14],borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.06)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#1D9E75',borderWidth:2}]},options:baseOpts({scales:{x:{grid:{display:false},ticks:{...T.font,color:T.color}},y:{grid:{color:T.grid},ticks:{...T.font,color:T.color}}}})});
+
+new Chart(document.getElementById('c2'),{type:'doughnut',data:{labels:['Ouverts','En cours','Résolus','Clôturés'],datasets:[{data:[47,38,156,43],backgroundColor:['#D85A30','#534AB7','#1D9E75','#888780'],borderWidth:0,hoverOffset:4}]},options:baseOpts({cutout:'68%'})});
+
+new Chart(document.getElementById('c3'),{type:'bar',data:{labels:['Jan','Fév','Mar','Avr','Mai','Jun'],datasets:[{label:'Créés',data:[42,55,48,61,58,47],backgroundColor:'#378ADD',borderRadius:3,borderSkipped:false},{label:'Résolus',data:[38,49,51,55,60,38],backgroundColor:'#1D9E75',borderRadius:3,borderSkipped:false}]},options:baseOpts({scales:{x:{grid:{display:false},ticks:{...T.font,color:T.color}},y:{grid:{color:T.grid},ticks:{...T.font,color:T.color}}}})});
+
+new Chart(document.getElementById('c4'),{type:'bar',data:{labels:['Faible','Moyenne','Haute','Critique'],datasets:[{data:[82,91,55,3],backgroundColor:['#888780','#378ADD','#EF9F27','#E24B4A'],borderRadius:4,borderSkipped:false}]},options:baseOpts({indexAxis:'y',scales:{x:{grid:{color:T.grid},ticks:{...T.font,color:T.color}},y:{grid:{display:false},ticks:{...T.font,color:T.color}}}})});
+
+new Chart(document.getElementById('c5'),{type:'bar',data:{labels:['Critique','Haute','Moyenne','Faible'],datasets:[{data:[1.5,4.2,12,48],backgroundColor:['#E24B4A','#EF9F27','#378ADD','#888780'],borderRadius:4,borderSkipped:false}]},options:baseOpts({scales:{x:{grid:{display:false},ticks:{...T.font,color:T.color}},y:{grid:{color:T.grid},ticks:{...T.font,color:T.color,callback:v=>v+'h'}}}})});
+
+new Chart(document.getElementById('c6'),{type:'doughnut',data:{labels:['Réseau','Serveur','Appli','Sécurité','Autre'],datasets:[{data:[34,52,78,19,18],backgroundColor:['#534AB7','#378ADD','#1D9E75','#EF9F27','#888780'],borderWidth:0,hoverOffset:3}]},options:baseOpts({cutout:'60%'})});
+
+new Chart(document.getElementById('c7'),{type:'bar',data:{labels:['Infra','NetOps','AppDev','SecOps'],datasets:[{label:'Ouverts',data:[12,9,18,8],backgroundColor:'#D85A30',borderRadius:3,borderSkipped:false},{label:'En cours',data:[8,6,15,9],backgroundColor:'#534AB7',borderRadius:3,borderSkipped:false}]},options:baseOpts({scales:{x:{stacked:true,grid:{display:false},ticks:{...T.font,color:T.color}},y:{stacked:true,grid:{color:T.grid},ticks:{...T.font,color:T.color}}}})});
+
+new Chart(document.getElementById('c8'),{type:'line',data:{labels:['S12','S13','S14','S15','S16','S17','S18','S19','S20','S21','S22','S23'],datasets:[{label:'Taux SLA',data:[88,91,94,96,93,89,92,95,97,90,88,82],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,.07)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:'#378ADD',borderWidth:2},{label:'Objectif',data:[95,95,95,95,95,95,95,95,95,95,95,95],borderColor:'#E24B4A',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}]},options:baseOpts({scales:{x:{grid:{display:false},ticks:{...T.font,color:T.color,autoSkip:false,maxRotation:0}},y:{min:75,max:100,grid:{color:T.grid},ticks:{...T.font,color:T.color,callback:v=>v+'%'}}}})});
+</script>

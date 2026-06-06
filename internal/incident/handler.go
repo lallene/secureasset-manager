@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"secureasset-manager/internal/auth"
-	"secureasset-manager/internal/notification"
-	ws "secureasset-manager/internal/websocket"
 	"time"
 
+	"secureasset-manager/internal/auth"
 	"secureasset-manager/internal/database"
+	"secureasset-manager/internal/notification"
+	ws "secureasset-manager/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,49 +33,59 @@ func calculateDueDate(priority string) time.Time {
 }
 
 func CreateIncident(c *gin.Context) {
-	var incident Incident
+	var input Incident
 
-	if err := c.ShouldBindJSON(&incident); err != nil {
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur non authentifié"})
+		return
+	}
 
-	if exists {
-		if idFloat, ok := userID.(float64); ok {
-			incident.CreatedByID = uint(idFloat)
+	var creator auth.User
+
+	if idFloat, ok := userID.(float64); ok {
+		if err := database.DB.First(&creator, uint(idFloat)).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur introuvable"})
+			return
 		}
 	}
 
-	incident.Status = "Open"
+	input.CreatedByID = creator.ID
+	input.SiteID = creator.SiteID
+	input.Status = "Open"
 
-	dueAt := calculateDueDate(incident.Priority)
-	incident.DueAt = &dueAt
+	dueAt := calculateDueDate(input.Priority)
+	input.DueAt = &dueAt
 
-	if err := database.DB.Create(&incident).Error; err != nil {
+	if err := database.DB.Create(&input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de créer l'incident"})
 		return
 	}
 
-	var technicians []auth.User
+	var agents []auth.User
 
 	database.DB.
-		Where("role = ?", "Technician").
-		Find(&technicians)
+		Where("role = ?", "Agent").
+		Where("service_id = ?", input.ServiceID).
+		Find(&agents)
 
-	ws.Broadcast("Nouveau ticket : " + incident.Title)
-
-	for _, tech := range technicians {
+	for _, agent := range agents {
 		notification.CreateNotification(
-			tech.ID,
+			agent.ID,
 			"Nouveau ticket",
-			incident.Title,
-			&incident.ID,
+			input.Title,
+			&input.ID,
 		)
 	}
 
-	c.JSON(http.StatusCreated, incident)
+	ws.Broadcast("Nouveau ticket : " + input.Title)
+
+	c.JSON(http.StatusCreated, input)
 }
 
 func GetIncidents(c *gin.Context) {
@@ -84,15 +94,30 @@ func GetIncidents(c *gin.Context) {
 	role, _ := c.Get("role")
 	userID, _ := c.Get("user_id")
 
-	query := database.DB.Preload("Asset")
+	query := database.DB.
+		Preload("Asset").
+		Preload("Site").
+		Preload("Service")
 
-	if role == "Viewer" {
+	if role == "Requester" {
 		if idFloat, ok := userID.(float64); ok {
 			query = query.Where("created_by_id = ?", uint(idFloat))
 		}
 	}
 
-	if err := query.Find(&incidents).Error; err != nil {
+	if role == "Agent" {
+		var user auth.User
+
+		if idFloat, ok := userID.(float64); ok {
+			if err := database.DB.First(&user, uint(idFloat)).Error; err == nil {
+				if user.ServiceID != nil {
+					query = query.Where("service_id = ?", *user.ServiceID)
+				}
+			}
+		}
+	}
+
+	if err := query.Order("created_at DESC").Find(&incidents).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Impossible de récupérer les incidents",
 		})
@@ -107,10 +132,12 @@ func GetIncidentByID(c *gin.Context) {
 
 	var incident Incident
 
-	if err := database.DB.Preload("Asset").First(&incident, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Incident introuvable",
-		})
+	if err := database.DB.
+		Preload("Asset").
+		Preload("Site").
+		Preload("Service").
+		First(&incident, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
 		return
 	}
 
@@ -123,8 +150,13 @@ func UpdateIncident(c *gin.Context) {
 	var incident Incident
 
 	if err := database.DB.First(&incident, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Incident introuvable",
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
+		return
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible de modifier un ticket clôturé",
 		})
 		return
 	}
@@ -132,7 +164,7 @@ func UpdateIncident(c *gin.Context) {
 	role, _ := c.Get("role")
 	userID, _ := c.Get("user_id")
 
-	if role == "Viewer" {
+	if role == "Requester" {
 		if idFloat, ok := userID.(float64); ok {
 			if incident.CreatedByID != uint(idFloat) {
 				c.JSON(http.StatusForbidden, gin.H{
@@ -144,29 +176,18 @@ func UpdateIncident(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&incident); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if incident.Status == "Closed" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Impossible de modifier un ticket clôturé",
-		})
-		return
-	}
-
-	if role == "Viewer" {
+	if role == "Requester" {
 		incident.Status = "Open"
 		incident.ResolvedAt = nil
 		incident.ClosedAt = nil
 	}
 
 	if err := database.DB.Save(&incident).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Impossible de modifier l'incident",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de modifier l'incident"})
 		return
 	}
 
@@ -179,8 +200,13 @@ func DeleteIncident(c *gin.Context) {
 	var incident Incident
 
 	if err := database.DB.First(&incident, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Incident introuvable",
+		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
+		return
+	}
+
+	if incident.Status == "Closed" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Impossible de supprimer un ticket clôturé",
 		})
 		return
 	}
@@ -188,7 +214,7 @@ func DeleteIncident(c *gin.Context) {
 	role, _ := c.Get("role")
 	userID, _ := c.Get("user_id")
 
-	if role == "Viewer" {
+	if role == "Requester" {
 		if idFloat, ok := userID.(float64); ok {
 			if incident.CreatedByID != uint(idFloat) {
 				c.JSON(http.StatusForbidden, gin.H{
@@ -199,23 +225,12 @@ func DeleteIncident(c *gin.Context) {
 		}
 	}
 
-	if incident.Status == "Closed" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Impossible de supprimer un ticket clôturé",
-		})
-		return
-	}
-
 	if err := database.DB.Delete(&incident).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Impossible de supprimer l'incident",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de supprimer l'incident"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Incident supprimé avec succès",
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Incident supprimé avec succès"})
 }
 
 func TakeIncident(c *gin.Context) {
@@ -236,16 +251,24 @@ func TakeIncident(c *gin.Context) {
 	}
 
 	userID, _ := c.Get("user_id")
-	email, _ := c.Get("email")
+
+	var agent auth.User
 
 	if idFloat, ok := userID.(float64); ok {
-		incident.AssignedTechnicianID = uint(idFloat)
+		if err := database.DB.First(&agent, uint(idFloat)).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Agent introuvable"})
+			return
+		}
 	}
 
-	if emailString, ok := email.(string); ok {
-		incident.AssignedTo = emailString
+	if agent.ServiceID == nil || *agent.ServiceID != incident.ServiceID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Vous ne pouvez prendre que les tickets de votre service",
+		})
+		return
 	}
 
+	incident.AssignedToID = &agent.ID
 	incident.Status = "In Progress"
 
 	if err := database.DB.Save(&incident).Error; err != nil {
@@ -262,10 +285,12 @@ func TakeIncident(c *gin.Context) {
 
 	database.DB.Create(&IncidentComment{
 		IncidentID: incident.ID,
-		UserID:     incident.AssignedTechnicianID,
+		UserID:     agent.ID,
 		Message:    "Ticket pris en charge",
 		Type:       "system",
 	})
+
+	ws.Broadcast("Ticket pris en charge : " + incident.Title)
 
 	c.JSON(http.StatusOK, incident)
 }
@@ -374,49 +399,6 @@ func CloseIncident(c *gin.Context) {
 	c.JSON(http.StatusOK, incident)
 }
 
-type ReactionInput struct {
-	Message string `json:"message" binding:"required"`
-}
-
-func ReactToIncident(c *gin.Context) {
-	id := c.Param("id")
-
-	var input ReactionInput
-	var incident Incident
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := database.DB.First(&incident, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Incident introuvable"})
-		return
-	}
-
-	if incident.Status == "Closed" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Impossible de réagir sur un ticket clôturé",
-		})
-		return
-	}
-
-	incident.Status = "Open"
-	incident.ResolvedAt = nil
-	incident.ClosedAt = nil
-
-	if err := database.DB.Save(&incident).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de réagir au ticket"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "Réaction ajoutée, ticket rouvert",
-		"reaction": input.Message,
-		"incident": incident,
-	})
-}
-
 type CommentInput struct {
 	Message string `json:"message" binding:"required"`
 }
@@ -464,20 +446,23 @@ func AddIncidentComment(c *gin.Context) {
 		return
 	}
 
-	ws.Broadcast("Nouveau commentaire sur : " + incident.Title)
+	if role == "Requester" {
+		incident.Status = "Open"
+		incident.ResolvedAt = nil
+		incident.ClosedAt = nil
+		database.DB.Save(&incident)
 
-	if role == "Viewer" {
-		if incident.AssignedTechnicianID > 0 {
+		if incident.AssignedToID != nil {
 			notification.CreateNotification(
-				incident.AssignedTechnicianID,
-				"Nouveau commentaire sur '"+incident.Title+"'",
+				*incident.AssignedToID,
+				"Nouveau commentaire",
 				input.Message,
 				&incident.ID,
 			)
 		}
 	}
 
-	if role == "Technician" {
+	if role == "Agent" {
 		notification.CreateNotification(
 			incident.CreatedByID,
 			"Nouveau commentaire",
@@ -485,6 +470,8 @@ func AddIncidentComment(c *gin.Context) {
 			&incident.ID,
 		)
 	}
+
+	ws.Broadcast("Nouveau commentaire sur : " + incident.Title)
 
 	c.JSON(http.StatusCreated, comment)
 }
@@ -532,9 +519,7 @@ func UploadIncidentAttachment(c *gin.Context) {
 	file, err := c.FormFile("file")
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Fichier manquant",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier manquant"})
 		return
 	}
 
@@ -547,12 +532,7 @@ func UploadIncidentAttachment(c *gin.Context) {
 		return
 	}
 
-	fileName := fmt.Sprintf(
-		"incident_%s_%s",
-		id,
-		file.Filename,
-	)
-
+	fileName := fmt.Sprintf("incident_%s_%s", id, file.Filename)
 	filePath := filepath.Join(uploadDir, fileName)
 
 	if err := c.SaveUploadedFile(file, filePath); err != nil {
