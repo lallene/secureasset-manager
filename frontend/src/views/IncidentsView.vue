@@ -282,7 +282,7 @@ onMounted(async () => {
           <p class="page-eyebrow">Gestion ITSM</p>
           <h1 class="page-title">Incidents</h1>
         </div>
-        <button v-if="role === 'Viewer'" class="btn-primary" @click="openCreateModal">
+        <button v-if="role === 'Requester'" class="btn-primary" @click="openCreateModal">
           <span>＋</span> Nouvel incident
         </button>
       </div>
@@ -414,35 +414,35 @@ onMounted(async () => {
                 <button class="action-btn" title="Voir les détails" @click="openDetailsModal(inc)">🔍</button>
 
                 <button
-                  v-if="(role === 'Admin' || role === 'Viewer') && inc.status !== 'Closed'"
+                  v-if="(role === 'Admin' || role === 'Requester') && inc.status !== 'Closed'"
                   class="action-btn edit"
                   title="Modifier"
                   @click="openEditModal(inc)"
                 >✏</button>
 
                 <button
-                  v-if="(role === 'Admin' || role === 'Viewer') && inc.status !== 'Closed'"
+                  v-if="(role === 'Admin' || role === 'Requester') && inc.status !== 'Closed'"
                   class="action-btn del"
                   title="Supprimer"
                   @click="deleteIncident(inc)"
                 >🗑</button>
 
                 <button
-                  v-if="role === 'Technician' && inc.status !== 'Resolved' && inc.status !== 'Closed'"
+                  v-if="role === 'Agent' && inc.status !== 'Resolved' && inc.status !== 'Closed'"
                   class="action-btn take"
                   title="Prendre en charge"
                   @click="takeIncident(inc)"
                 >⚡</button>
 
                 <button
-                  v-if="role === 'Technician' && inc.status === 'In Progress'"
+                  v-if="role === 'Agent' && inc.status === 'In Progress'"
                   class="action-btn resolve"
                   title="Résoudre"
                   @click="resolveIncident(inc)"
                 >✅</button>
 
                 <button
-                  v-if="role === 'Technician' && inc.status === 'Resolved'"
+                  v-if="role === 'Agent' && inc.status === 'Resolved'"
                   class="action-btn close-btn"
                   title="Clôturer"
                   @click="closeIncident(inc)"
@@ -687,7 +687,7 @@ onMounted(async () => {
             </div>
 
             <!-- Quick actions -->
-            <div class="detail-block" v-if="role === 'Technician'">
+            <div class="detail-block" v-if="role === 'Agent'">
               <p class="detail-block-label">Actions rapides</p>
               <div class="quick-actions">
                 <button

@@ -28,13 +28,12 @@ const getToken = () => localStorage.getItem("token");
 const role = computed(() => localStorage.getItem("role") || "");
 
 const statusConfig = {
-  Actif: { color: "#059669", bg: "#d1fae5", dot: "#10b981" },
-  Inactif: { color: "#6b7280", bg: "#f3f4f6", dot: "#9ca3af" },
-  "En maintenance": { color: "#d97706", bg: "#fef3c7", dot: "#f59e0b" },
-  Défaillant: { color: "#dc2626", bg: "#fee2e2", dot: "#ef4444" },
+  Active: { color: "#059669", bg: "#d1fae5", dot: "#10b981" },
+  Maintenance: { color: "#d97706", bg: "#fef3c7", dot: "#f59e0b" },
+  Retired: { color: "#6b7280", bg: "#f3f4f6", dot: "#9ca3af" },
 };
 
-const statusOptions = ["Actif", "Inactif", "En maintenance", "Défaillant"];
+const statusOptions = ["Active", "Maintenance", "Retired"];
 const typeOptions = ["Serveur", "Poste de travail", "Switch", "Routeur", "Imprimante", "NAS", "Firewall", "Autre"];
 
 const getStatusStyle = (status) => {
@@ -57,7 +56,7 @@ const filteredAssets = computed(() => {
         a.name?.toLowerCase().includes(q) ||
         a.type?.toLowerCase().includes(q) ||
         a.ip_address?.toLowerCase().includes(q) ||
-        a.site?.toLowerCase().includes(q) ||
+          a.site?.name?.toLowerCase().includes(q) ||
         a.assigned_to?.toLowerCase().includes(q)
     );
   }
@@ -66,9 +65,9 @@ const filteredAssets = computed(() => {
 
 const stats = computed(() => ({
   total: assets.value.length,
-  actif: assets.value.filter((a) => a.status === "Actif").length,
-  maintenance: assets.value.filter((a) => a.status === "En maintenance").length,
-  defaillant: assets.value.filter((a) => a.status === "Défaillant").length,
+  actif: assets.value.filter((a) => a.status === "Active").length,
+  maintenance: assets.value.filter((a) => a.status === "Maintenance").length,
+  defaillant: assets.value.filter((a) => a.status === "Retired").length,
 }));
 
 const resetForm = () => {
@@ -102,14 +101,26 @@ const openEditModal = (asset) => {
 
 const saveAsset = async () => {
   try {
+    error.value = "";
+
+    const payload = {
+      ...form.value,
+      site_id: form.value.site_id ? Number(form.value.site_id) : null,
+    };
+
     if (isEditMode.value) {
-      await api.put(`/assets/${editingAssetId.value}`, form.value, { headers: { Authorization: `Bearer ${getToken()}` } });
+      await api.put(`/assets/${editingAssetId.value}`, payload, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
     } else {
-      await api.post("/assets", form.value, { headers: { Authorization: `Bearer ${getToken()}` } });
+      await api.post("/assets", payload, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
     }
+
     showModal.value = false;
     resetForm();
-    fetchAssets();
+    await fetchAssets();
   } catch (err) {
     console.error(err);
     error.value = "Erreur lors de l'enregistrement";
