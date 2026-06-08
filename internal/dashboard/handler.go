@@ -3,6 +3,7 @@ package dashboard
 import (
 	"net/http"
 	"secureasset-manager/internal/asset"
+	"secureasset-manager/internal/cmdb"
 	"time"
 
 	"secureasset-manager/internal/database"
@@ -105,6 +106,12 @@ func GetStats(c *gin.Context) {
 	var criticalIncidents int64
 
 	var unreadNotifications int64
+	var totalApplications int64
+	var totalDatabases int64
+	var totalRelations int64
+
+	var criticalApplications int64
+	var productionDatabases int64
 
 	assetQuery := database.DB.Model(&asset.Asset{})
 
@@ -166,6 +173,22 @@ func GetStats(c *gin.Context) {
 		Where("due_at IS NOT NULL").
 		Where("due_at < ?", time.Now()).
 		Count(&overdueIncidents)
+
+	database.DB.Model(&cmdb.Application{}).Count(&totalApplications)
+
+	database.DB.Model(&cmdb.Application{}).
+		Where("criticality = ?", "Critical").
+		Count(&criticalApplications)
+
+	database.DB.Model(&cmdb.Database{}).
+		Count(&totalDatabases)
+
+	database.DB.Model(&cmdb.Database{}).
+		Where("environment = ?", "Production").
+		Count(&productionDatabases)
+
+	database.DB.Model(&cmdb.ConfigurationRelation{}).
+		Count(&totalRelations)
 
 	mttrCritical := calculateMTTR("Critical", siteID, serviceID, startDate)
 	mttrHigh := calculateMTTR("High", siteID, serviceID, startDate)
@@ -344,6 +367,11 @@ func GetStats(c *gin.Context) {
 		"sla_resolution_rate":   slaResolutionRate,
 		"reopening_rate":        reopeningRate,
 		"sla_history":           slaHistory,
+		"total_applications":    totalApplications,
+		"critical_applications": criticalApplications,
+		"total_databases":       totalDatabases,
+		"production_databases":  productionDatabases,
+		"total_relations":       totalRelations,
 		"filters": gin.H{
 			"site_id":    siteID,
 			"service_id": serviceID,

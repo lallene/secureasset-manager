@@ -1,2 +1,7 @@
-GET http://localhost:8080/incidents/1/attachments
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InZpZXdlckB0ZXN0LmNvbSIsImV4cCI6MTc4MDc1NzY2OCwicm9sZSI6IlZpZXdlciIsInVzZXJfaWQiOjR9.aPP0ylFU92BVV_iwg3whgyG7T0A-mJXeGkSLD4SVi1M
+###
+# curl -X GET http://localhost:8080/cmdb/impact/1
+#  -H "Authorization: Bearer TON_TOKEN_ICI"
+GET http://localhost:8080/cmdb/impact/936
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluMUB0ZXN0LmNvbSIsImV4cCI6MTc4MTAxMTIzMywicm9sZSI6IkFkbWluIiwidXNlcl9pZCI6MX0.ZtZY0TZUo_9OA-Ibu6HCMMg9_GAcfgKiTCO45lgUsOI
+
+###

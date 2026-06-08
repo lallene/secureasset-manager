@@ -3,6 +3,13 @@ import { onMounted, ref, computed } from "vue";
 import api from "../api/axios";
 import DashboardLayout from "../layouts/DashboardLayout.vue";
 
+import DataTable from "datatables.net-vue3";
+import DataTablesCore from "datatables.net-dt";
+
+import "datatables.net-dt/css/dataTables.dataTables.css";
+
+DataTable.use(DataTablesCore);
+
 const relations = ref([]);
 const applications = ref([]);
 const databases = ref([]);
@@ -34,6 +41,37 @@ const headers = () => ({
   headers: { Authorization: `Bearer ${getToken()}` },
 });
 
+// Mapping des libellés sémantiques pour les relations
+const relationConfig = {
+  hosted_on:     { class: "p-ind",  label: "hosted_on" },
+  uses_database: { class: "p-rose", label: "uses_database" },
+  depends_on:    { class: "p-amb",  label: "depends_on" },
+  connects_to:   { class: "p-grn",  label: "connects_to" }
+};
+
+const columns = [
+  { data: "source_id", title: "Élément Source" },
+  { data: "relation_type", title: "Type de Liaison" },
+  { data: "target_id", title: "Élément Cible" },
+  { data: null, title: "Actions", orderable: false, className: "text-right" }
+];
+
+const dtOptions = {
+  responsive: true,
+  pageLength: 10,
+  dom: 't<"dt-footer flex items-center justify-between p-4"ip>',
+  language: {
+    info: "Affichage de _START_ à _END_ sur _TOTAL_ liaisons topologiques",
+    infoEmpty: "Aucune relation répertoriée",
+    infoFiltered: "(filtré depuis _MAX_ éléments)",
+    zeroRecords: "Aucune dépendance trouvée",
+    paginate: {
+      next: "➔",
+      previous: " Zar "
+    }
+  }
+};
+
 const fetchRelations = async () => {
   try {
     const response = await api.get("/cmdb/relations", headers());
@@ -48,83 +86,50 @@ const fetchApplications = async () => {
   try {
     const response = await api.get("/cmdb/applications", headers());
     applications.value = response.data;
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) {}
 };
 
 const fetchDatabases = async () => {
   try {
     const response = await api.get("/cmdb/databases", headers());
     databases.value = response.data;
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) {}
 };
 
 const fetchAssets = async () => {
   try {
     const response = await api.get("/assets", headers());
     assets.value = response.data;
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) {}
 };
 
 const getItemsByType = (type) => {
   switch (type) {
-    case "Application":
-      return applications.value;
-    case "Asset":
-      return assets.value;
-    case "Database":
-      return databases.value;
-    default:
-      return [];
+    case "Application": return applications.value;
+    case "Asset": return assets.value;
+    case "Database": return databases.value;
+    default: return [];
   }
 };
 
 const getItemLabel = (type, id) => {
   const item = getItemsByType(type).find((el) => Number(el.ID) === Number(id));
-
-  if (!item) {
-    return `${type} #${id}`;
-  }
-
-  if (type === "Asset") {
-    return item.name || `Asset #${id}`;
-  }
-
-  if (type === "Database") {
-    return item.name || `Database #${id}`;
-  }
-
+  if (!item) return `${type} #${id}`;
   return item.name || `${type} #${id}`;
 };
 
 const resetForm = () => {
-  form.value = {
-    source_type: "Application",
-    source_id: "",
-    relation_type: "hosted_on",
-    target_type: "Asset",
-    target_id: "",
-  };
-
+  form.value = { source_type: "Application", source_id: "", relation_type: "hosted_on", target_type: "Asset", target_id: "" };
   isEditMode.value = false;
   editingRelationId.value = null;
   error.value = "";
 };
 
-const openCreateModal = () => {
-  resetForm();
-  showModal.value = true;
-};
+const openCreateModal = () => { resetForm(); showModal.value = true; };
 
 const openEditModal = (relation) => {
   isEditMode.value = true;
   editingRelationId.value = relation.ID;
-
   form.value = {
     source_type: relation.source_type,
     source_id: relation.source_id,
@@ -132,7 +137,6 @@ const openEditModal = (relation) => {
     target_type: relation.target_type,
     target_id: relation.target_id,
   };
-
   showModal.value = true;
 };
 
@@ -140,7 +144,6 @@ const saveRelation = async () => {
   try {
     isSubmitting.value = true;
     error.value = "";
-
     const payload = {
       ...form.value,
       source_id: Number(form.value.source_id),
@@ -152,35 +155,28 @@ const saveRelation = async () => {
     } else {
       await api.post("/cmdb/relations", payload, headers());
     }
-
     showModal.value = false;
     resetForm();
     await fetchRelations();
   } catch (err) {
-    console.error(err);
-    error.value = "Impossible d'enregistrer la relation";
+    error.value = "Impossible de valider le couplage des composants";
   } finally {
     isSubmitting.value = false;
   }
 };
 
 const deleteRelation = async (relation) => {
-  if (!confirm("Supprimer cette relation CMDB ?")) return;
-
+  if (!confirm("Supprimer cette relation du graphe de dépendance ?")) return;
   try {
     await api.delete(`/cmdb/relations/${relation.ID}`, headers());
     await fetchRelations();
   } catch (err) {
-    console.error(err);
-    error.value = "Impossible de supprimer la relation";
+    error.value = "Échec de l'altération de la topologie";
   }
 };
 
 const filteredRelations = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return relations.value;
-  }
-
+  if (!searchQuery.value.trim()) return relations.value;
   const q = searchQuery.value.toLowerCase();
 
   return relations.value.filter((rel) => {
@@ -214,237 +210,284 @@ onMounted(() => {
 
 <template>
   <DashboardLayout>
-    <div class="p-8">
-      <div class="flex items-center justify-between mb-8">
+    <div class="topbar flex items-center justify-between">
+      <div>
+        <span class="tb-env">CMDB / Graphe de dépendances</span>
+        <h1>Relations</h1>
+        <p class="text-sm text-slate-500 mt-1">
+          Cartographiez les dépendances structurelles entre vos applications, assets et bases de données.
+        </p>
+      </div>
+
+      <button v-if="role === 'Admin'" @click="openCreateModal" class="btn-primary flex items-center gap-2">
+        <span>+</span> Ajouter une relation
+      </button>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-muted flex items-center justify-center text-base w-11 h-11">Σ</div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-            CMDB
-          </p>
-          <h1 class="text-2xl font-semibold text-slate-900">
-            Relations
-          </h1>
-          <p class="text-sm text-slate-500 mt-1">
-            Cartographiez les dépendances entre applications, assets et bases de données.
-          </p>
-        </div>
-
-        <button
-            v-if="role === 'Admin'"
-            @click="openCreateModal"
-            class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium"
-        >
-          Ajouter une relation
-        </button>
-      </div>
-
-      <div class="grid grid-cols-4 gap-4 mb-6">
-        <div class="bg-white border border-slate-100 rounded-2xl p-5">
-          <p class="text-sm text-slate-500">Relations</p>
-          <p class="text-3xl font-bold text-slate-900 mt-1">{{ stats.total }}</p>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-2xl p-5">
-          <p class="text-sm text-slate-500">Hébergement</p>
-          <p class="text-3xl font-bold text-indigo-600 mt-1">{{ stats.hosted }}</p>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-2xl p-5">
-          <p class="text-sm text-slate-500">Bases liées</p>
-          <p class="text-3xl font-bold text-blue-600 mt-1">{{ stats.database }}</p>
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-2xl p-5">
-          <p class="text-sm text-slate-500">Dépendances</p>
-          <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.depends }}</p>
+          <div class="kc-lbl text-xs">Total Relations</div>
+          <div class="kc-val text-xl font-bold mt-0.5">{{ stats.total }}</div>
         </div>
       </div>
-
-      <div class="mb-5">
-        <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Rechercher source, cible ou type de relation…"
-            class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-        />
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-brand flex items-center justify-center text-base w-11 h-11">☁</div>
+        <div>
+          <div class="kc-lbl text-xs">Hébergements</div>
+          <div class="kc-val text-xl font-bold mt-0.5" style="color: var(--brand-light)">{{ stats.hosted }}</div>
+        </div>
       </div>
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-info flex items-center justify-center text-base w-11 h-11">⛃</div>
+        <div>
+          <div class="kc-lbl text-xs">Bases liées</div>
+          <div class="kc-val text-xl font-bold mt-0.5" style="color: var(--c-info-t)">{{ stats.database }}</div>
+        </div>
+      </div>
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-warn flex items-center justify-center text-base w-11 h-11">⚡</div>
+        <div>
+          <div class="kc-lbl text-xs">Dépendances</div>
+          <div class="kc-val text-xl font-bold mt-0.5" style="color: var(--c-warn-t)">{{ stats.depends }}</div>
+        </div>
+      </div>
+    </div>
 
-      <div
-          v-if="error"
-          class="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-sm"
+    <div class="fbar flex items-center relative mb-6">
+      <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Rechercher une source, une cible ou un type de relation (ex: hosted_on, asset...)"
+          class="search-input w-full pl-4 pr-10 py-2.5 text-sm"
+      />
+      <div class="absolute right-4 top-3 text-sm pointer-events-none">🔍</div>
+    </div>
+
+    <div v-if="error" class="modal-error error-bar mb-6 flex items-center gap-2">
+      <span>⚠️</span> {{ error }}
+    </div>
+
+    <div class="table-card overflow-hidden cmdb-dt-wrapper">
+      <DataTable
+          :data="filteredRelations"
+          :columns="columns"
+          class="w-full text-left border-collapse"
+          :options="dtOptions"
       >
-        {{ error }}
-      </div>
+        <template #column-source_id="{ rowData }">
+          <div class="font-medium" style="color: var(--tx-primary);">
+            {{ getItemLabel(rowData.source_type, rowData.source_id) }}
+          </div>
+          <div class="text-[11px]" style="color: var(--tx-muted);">
+            {{ rowData.source_type }}
+          </div>
+        </template>
 
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-left">
-          <thead class="bg-slate-50 border-b border-slate-100">
-          <tr>
-            <th class="p-4 text-xs uppercase text-slate-400">Source</th>
-            <th class="p-4 text-xs uppercase text-slate-400">Relation</th>
-            <th class="p-4 text-xs uppercase text-slate-400">Cible</th>
-            <th class="p-4 text-xs uppercase text-slate-400 text-right">Actions</th>
-          </tr>
-          </thead>
+        <template #column-relation_type="{ cellData }">
+          <span :class="['pill text-xs font-mono px-2.5 py-0.5 rounded-full border', relationConfig[cellData]?.class || 'p-sl']">
+            {{ relationConfig[cellData]?.label || cellData }}
+          </span>
+        </template>
 
-          <tbody class="divide-y divide-slate-100">
-          <tr
-              v-for="relation in filteredRelations"
-              :key="relation.ID"
-              class="hover:bg-slate-50"
-          >
-            <td class="p-4">
-              <div class="font-medium text-slate-900">
-                {{ getItemLabel(relation.source_type, relation.source_id) }}
-              </div>
-              <div class="text-xs text-slate-400 mt-1">
-                {{ relation.source_type }}
-              </div>
-            </td>
+        <template #column-target_id="{ rowData }">
+          <div class="font-medium" style="color: var(--tx-primary);">
+            {{ getItemLabel(rowData.target_type, rowData.target_id) }}
+          </div>
+          <div class="text-[11px]" style="color: var(--tx-muted);">
+            {{ rowData.target_type }}
+          </div>
+        </template>
 
-            <td class="p-4">
-                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border bg-indigo-50 text-indigo-700 border-indigo-100">
-                  {{ relation.relation_type }}
-                </span>
-            </td>
-
-            <td class="p-4">
-              <div class="font-medium text-slate-900">
-                {{ getItemLabel(relation.target_type, relation.target_id) }}
-              </div>
-              <div class="text-xs text-slate-400 mt-1">
-                {{ relation.target_type }}
-              </div>
-            </td>
-
-            <td class="p-4 text-right">
-              <button
-                  v-if="role === 'Admin'"
-                  @click="openEditModal(relation)"
-                  class="text-blue-600 hover:underline mr-4"
-              >
-                Modifier
-              </button>
-
-              <button
-                  v-if="role === 'Admin'"
-                  @click="deleteRelation(relation)"
-                  class="text-red-600 hover:underline"
-              >
-                Supprimer
-              </button>
-            </td>
-          </tr>
-
-          <tr v-if="filteredRelations.length === 0">
-            <td colspan="4" class="p-10 text-center text-slate-400">
-              Aucune relation CMDB trouvée.
-            </td>
-          </tr>
-          </tbody>
-        </table>
-      </div>
+        <template #column-3="{ rowData }">
+          <div class="flex justify-end gap-1.5">
+            <button
+                v-if="role === 'Admin'"
+                class="action-btn action-edit text-xs"
+                title="Ajuster la liaison"
+                @click="openEditModal(rowData)"
+            >✏️</button>
+            <button
+                v-if="role === 'Admin'"
+                class="action-btn action-delete text-xs"
+                title="Supprimer la dépendance"
+                @click="deleteRelation(rowData)"
+            >🗑️</button>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </DashboardLayout>
 
-  <div
-      v-if="showModal"
-      class="fixed inset-0 bg-slate-950/40 flex items-center justify-center p-4 z-50"
-  >
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl">
-      <div class="p-6 border-b border-slate-100 flex justify-between">
-        <h2 class="text-lg font-semibold">
-          {{ isEditMode ? "Modifier la relation" : "Ajouter une relation" }}
-        </h2>
+  <Teleport to="body">
+    <div v-if="showModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 z-50" @click.self="showModal = false">
+      <div class="modal rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
 
-        <button @click="showModal = false">✕</button>
+        <div class="modal-header p-5 flex justify-between items-center border-b" style="border-color: var(--bd-subtle)">
+          <div>
+            <span class="modal-eyebrow text-xs font-bold uppercase tracking-wider block mb-0.5" style="color: var(--brand-light)">Topologie Réseau</span>
+            <h2 class="modal-title text-lg font-semibold m-0">
+              {{ isEditMode ? "Modifier la relation" : "Ajouter une relation" }}
+            </h2>
+          </div>
+          <button @click="showModal = false" class="modal-close p-2">✕</button>
+        </div>
+
+        <form @submit.prevent="saveRelation">
+          <div class="p-5 space-y-5 overflow-y-auto max-h-[70vh]">
+
+            <div class="p-4 rounded-xl border" style="background: var(--bg-base); border-color: var(--bd-subtle);">
+              <span class="block text-xs font-bold uppercase tracking-wider mb-3" style="color: var(--tx-muted)">Composant Source (Départ)</span>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium">Type CI</label>
+                  <select v-model="form.source_type" class="field-input w-full appearance-none cursor-pointer" @change="form.source_id = ''">
+                    <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
+                  </select>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium">Instance</label>
+                  <select v-model="form.source_id" required class="field-input w-full appearance-none cursor-pointer">
+                    <option value="" disabled selected>Sélectionner la source</option>
+                    <option v-for="item in getItemsByType(form.source_type)" :key="item.ID" :value="item.ID">
+                      {{ item.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1.5 px-1">
+              <label class="text-xs font-medium">Nature de l'interdépendance (Verbe de liaison)</label>
+              <select v-model="form.relation_type" required class="field-input w-full appearance-none cursor-pointer">
+                <option v-for="relation in relationOptions" :key="relation" :value="relation">{{ relation }}</option>
+              </select>
+            </div>
+
+            <div class="p-4 rounded-xl border" style="background: var(--bg-base); border-color: var(--bd-subtle);">
+              <span class="block text-xs font-bold uppercase tracking-wider mb-3" style="color: var(--tx-muted)">Composant Cible (Arrivée)</span>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium">Type CI</label>
+                  <select v-model="form.target_type" class="field-input w-full appearance-none cursor-pointer" @change="form.target_id = ''">
+                    <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
+                  </select>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium">Instance</label>
+                  <select v-model="form.target_id" required class="field-input w-full appearance-none cursor-pointer">
+                    <option value="" disabled selected>Sélectionner la cible</option>
+                    <option v-for="item in getItemsByType(form.target_type)" :key="item.ID" :value="item.ID">
+                      {{ item.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="modal-footer p-4 flex justify-end gap-3 border-t" style="border-color: var(--bd-subtle); background: rgba(0,0,0,0.05)">
+            <button type="button" @click="showModal = false" class="btn-ghost">Annuler</button>
+            <button type="submit" :disabled="isSubmitting" class="btn-primary min-w-[100px]">
+              <span v-if="isSubmitting" class="inline-block spinner w-4 h-4 rounded-full border-2 animate-spin mr-2" style="vertical-align: sub;"></span>
+              {{ isEditMode ? "Enregistrer" : "Créer le lien" }}
+            </button>
+          </div>
+        </form>
       </div>
-
-      <form @submit.prevent="saveRelation" class="p-6 space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <select v-model="form.source_type" class="input" @change="form.source_id = ''">
-            <option v-for="type in typeOptions" :key="type" :value="type">
-              {{ type }}
-            </option>
-          </select>
-
-          <select v-model="form.source_id" required class="input">
-            <option value="">Sélectionner la source</option>
-            <option
-                v-for="item in getItemsByType(form.source_type)"
-                :key="item.ID"
-                :value="item.ID"
-            >
-              {{ item.name }}
-            </option>
-          </select>
-        </div>
-
-        <select v-model="form.relation_type" required class="input">
-          <option v-for="relation in relationOptions" :key="relation" :value="relation">
-            {{ relation }}
-          </option>
-        </select>
-
-        <div class="grid grid-cols-2 gap-4">
-          <select v-model="form.target_type" class="input" @change="form.target_id = ''">
-            <option v-for="type in typeOptions" :key="type" :value="type">
-              {{ type }}
-            </option>
-          </select>
-
-          <select v-model="form.target_id" required class="input">
-            <option value="">Sélectionner la cible</option>
-            <option
-                v-for="item in getItemsByType(form.target_type)"
-                :key="item.ID"
-                :value="item.ID"
-            >
-              {{ item.name }}
-            </option>
-          </select>
-        </div>
-
-        <div class="flex justify-end gap-3 pt-4">
-          <button
-              type="button"
-              @click="showModal = false"
-              class="btn-secondary"
-          >
-            Annuler
-          </button>
-
-          <button
-              type="submit"
-              :disabled="isSubmitting"
-              class="btn-primary"
-          >
-            {{ isEditMode ? "Enregistrer" : "Créer" }}
-          </button>
-        </div>
-      </form>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
-.input {
-  width: 100%;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px 12px;
+.btn-primary, .btn-ghost {
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.action-btn {
+  padding: 6px 10px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.error-bar {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid;
   font-size: 14px;
 }
 
-.btn-primary {
-  background: #0f172a;
-  color: white;
-  padding: 9px 16px;
-  border-radius: 12px;
+.modal-header, .modal-footer {
+  border-style: solid;
 }
 
-.btn-secondary {
-  border: 1px solid #e2e8f0;
-  padding: 9px 16px;
-  border-radius: 12px;
+.spinner {
+  border-color: transparent;
+  border-top-color: #fff;
+}
+</style>
+
+<style>
+/* Encapsulation globale DataTables mappée sur ton UI dark system */
+.cmdb-dt-wrapper table.dataTable {
+  border-collapse: collapse !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable thead th {
+  background: rgba(0,0,0,0.15) !important;
+  color: var(--tx-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid var(--bd-subtle) !important;
+  padding: 12px 16px !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody td {
+  padding: 14px 16px !important;
+  border-bottom: 1px solid var(--bd-subtle) !important;
+  background: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody tr {
+  background-color: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody tr:hover td {
+  background-color: rgba(255, 255, 255, 0.01) !important;
+}
+
+.dt-footer {
+  border-top: 1px solid var(--bd-subtle);
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--tx-muted);
+  font-size: 12px;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+  background: var(--bg-base) !important;
+  border: 1px solid var(--bd-subtle) !important;
+  color: var(--tx-secondary) !important;
+  border-radius: var(--r-sm) !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: var(--brand) !important;
+  color: white !important;
+  border-color: var(--brand) !important;
 }
 </style>

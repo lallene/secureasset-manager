@@ -1,343 +1,478 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, computed } from "vue";
 import api from "../api/axios";
 import DashboardLayout from "../layouts/DashboardLayout.vue";
 
-const users = ref([]);
+import DataTable from "datatables.net-vue3";
+import DataTablesCore from "datatables.net-dt";
+
+import "datatables.net-dt/css/dataTables.dataTables.css";
+
+DataTable.use(DataTablesCore);
+
+const applications = ref([]);
+const sites = ref([]);
+
 const showModal = ref(false);
+const isEditMode = ref(false);
+const editingApplicationId = ref(null);
+
 const error = ref("");
 const isSubmitting = ref(false);
-
-const sites = ref([]);
-const services = ref([]);
-const isEditMode = ref(false);
-const editingUserId = ref(null);
+const searchQuery = ref("");
+const filterCriticity = ref("all");
 
 const form = ref({
   name: "",
-  email: "",
-  password: "",
-  role: "Requester",
+  code: "",
+  criticity: "P3",
+  environment: "Production",
   site_id: "",
-  service_id: "",
 });
 
-const fetchSites = async () => {
-  const response = await api.get("/sites", {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  sites.value = response.data;
-};
-
-const fetchServices = async () => {
-  const response = await api.get("/services", {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  services.value = response.data;
-};
-
 const getToken = () => localStorage.getItem("token");
+const role = computed(() => localStorage.getItem("role") || "");
 
-const fetchUsers = async () => {
-  try {
-    const response = await api.get("/users", {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    users.value = response.data;
-  } catch (err) {
-    console.error(err);
-    error.value = "Accès refusé ou impossible de charger les utilisateurs";
+const criticityOptions = ["P1", "P2", "P3", "P4"];
+const environmentOptions = ["Production", "Preproduction", "Staging", "Development", "Test"];
+
+// Configuration visuelle des criticités CMDB (SLA / Impact)
+const criticityConfig = {
+  P1: { class: "bdg-rose pulse-slow font-bold", label: "P1 - Critique" },
+  P2: { class: "bdg-amb font-semibold",        label: "P2 - Élevé" },
+  P3: { class: "bdg-ind",                      label: "P3 - Moyen" },
+  P4: { class: "bdg-sl",                       label: "P4 - Faible" }
+};
+
+const environmentConfig = {
+  Production:    { class: "p-rose", label: "Production" },
+  Preproduction: { class: "p-ind",  label: "Preprod" },
+  Staging:       { class: "p-amb",  label: "Staging" },
+  Development:   { class: "p-sl",   label: "Dev" },
+  Test:          { class: "p-sl",   label: "Test" }
+};
+
+const columns = [
+  { data: "name", title: "Application", defaultContent: "Sans nom" },
+  { data: "code", title: "Code Trigramme", defaultContent: "" },
+  { data: "criticity", title: "Criticité (SLA)", defaultContent: "P3" }, // ◄ Sécurisé ici avec "P3" par défaut
+  { data: "environment", title: "Environnement", defaultContent: "Production" }, // ◄ Sécurisé ici
+  { data: "site.name", title: "Site Principal", defaultContent: "—" },
+  { data: null, title: "Actions", orderable: false, className: "text-right" }
+];
+
+const dtOptions = {
+  responsive: true,
+  pageLength: 10,
+  dom: 't<"dt-footer flex items-center justify-between p-4"ip>',
+  language: {
+    info: "Affichage de _START_ à _END_ sur _TOTAL_ applications cataloguées",
+    infoEmpty: "Aucune application répertoriée",
+    infoFiltered: "(filtré depuis _MAX_ éléments)",
+    zeroRecords: "Aucun asset applicatif trouvé",
+    paginate: {
+      next: "➔",
+      previous: " Zar "
+    }
   }
 };
 
+const fetchApplications = async () => {
+  try {
+    const response = await api.get("/cmdb/applications", {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    applications.value = response.data || [];
+  } catch (err) {
+    console.error(err);
+    error.value = "Impossible de charger le catalogue des applications";
+  }
+};
 
-const saveUser = async () => {
+const fetchSites = async () => {
+  try {
+    const response = await api.get("/sites", {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    sites.value = response.data || [];
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const filteredApplications = computed(() => {
+  let list = applications.value;
+
+  if (filterCriticity.value !== "all") {
+    list = list.filter((app) => app.criticity === filterCriticity.value);
+  }
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase();
+    list = list.filter(
+        (app) =>
+            app.name?.toLowerCase().includes(q) ||
+            app.code?.toLowerCase().includes(q) ||
+            app.criticity?.toLowerCase().includes(q) ||
+            app.environment?.toLowerCase().includes(q) ||
+            app.site?.name?.toLowerCase().includes(q)
+    );
+  }
+
+  return list;
+});
+
+const stats = computed(() => ({
+  total: applications.value.length,
+  p1: applications.value.filter((app) => app.criticity === "P1").length,
+  production: applications.value.filter((app) => app.environment === "Production").length,
+}));
+
+const resetForm = () => {
+  form.value = { name: "", code: "", criticity: "P3", environment: "Production", site_id: "" };
+  isEditMode.value = false;
+  editingApplicationId.value = null;
+  error.value = "";
+};
+
+const openCreateModal = () => { resetForm(); showModal.value = true; };
+
+const openEditModal = (app) => {
+  isEditMode.value = true;
+  editingApplicationId.value = app.ID;
+  form.value = {
+    name: app.name || "",
+    code: app.code || "",
+    criticity: app.criticity || "P3",
+    environment: app.environment || "Production",
+    site_id: app.site_id || "",
+  };
+  showModal.value = true;
+};
+
+const saveApplication = async () => {
   try {
     isSubmitting.value = true;
     error.value = "";
-
     const payload = {
       ...form.value,
-      site_id: Number(form.value.site_id),
-      service_id: form.value.service_id ? Number(form.value.service_id) : null,
+      site_id: form.value.site_id ? Number(form.value.site_id) : null,
     };
 
     if (isEditMode.value) {
-      await api.put(`/users/${editingUserId.value}`, payload, {
+      await api.put(`/cmdb/applications/${editingApplicationId.value}`, payload, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
     } else {
-      await api.post("/users", payload, {
+      await api.post("/cmdb/applications", payload, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
     }
-
     showModal.value = false;
     resetForm();
-    await fetchUsers();
+    await fetchApplications();
   } catch (err) {
     console.error(err);
-    error.value = "Impossible d'enregistrer l'utilisateur";
+    error.value = "Erreur lors de la mise à jour du catalogue applicatif";
   } finally {
     isSubmitting.value = false;
   }
 };
 
-const resetForm = () => {
-  form.value = {
-    name: "",
-    email: "",
-    password: "",
-    role: "Requester",
-    site_id: "",
-    service_id: "",
-  };
-
-  isEditMode.value = false;
-  editingUserId.value = null;
-};
-
-const openCreateModal = () => {
-  resetForm();
-  showModal.value = true;
-};
-
-const openEditModal = (user) => {
-  isEditMode.value = true;
-  editingUserId.value = user.ID;
-
-  form.value = {
-    name: user.name,
-    email: user.email,
-    password: "",
-    role: user.role,
-    site_id: user.site_id,
-    service_id: user.service_id || "",
-  };
-
-  showModal.value = true;
-};
-
-const deleteUser = async (user) => {
-  if (!confirm(`Supprimer l'utilisateur ${user.name} ?`)) return;
-
-  await api.delete(`/users/${user.ID}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-
-  fetchUsers();
-};
-
-
-
-// Utilitaire de style pour afficher des badges de rôle élégants
-const getRoleBadgeClass = (role) => {
-  switch (role?.toLowerCase()) {
-    case "admin":
-      return "bg-purple-50 text-purple-700 border-purple-100";
-
-    case "agent":
-      return "bg-blue-50 text-blue-700 border-blue-100";
-
-    case "requester":
-      return "bg-green-50 text-green-700 border-green-100";
-
-    default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
+const deleteApplication = async (app) => {
+  if (!confirm(`Supprimer l'application "${app.name}" ? (Attention aux liaisons CMDB actives)`)) return;
+  try {
+    await api.delete(`/cmdb/applications/${app.ID}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    await fetchApplications();
+  } catch (err) {
+    console.error(err);
+    error.value = "Impossible de purger cet élément (Contraintes d'intégrité en cours)";
   }
 };
 
 onMounted(() => {
-  fetchUsers();
+  fetchApplications();
   fetchSites();
-  fetchServices();
 });
 </script>
 
 <template>
-  <DashboardLayout class="bg-slate-50/50 min-h-screen text-slate-900">
-    <!-- Entête de page -->
-    <div class="flex items-center justify-between mb-8">
+  <DashboardLayout>
+    <div class="topbar flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Utilisateurs</h1>
-        <p class="text-sm text-slate-500 mt-1">Gérez les accès et les permissions de vos collaborateurs.</p>
+        <span class="tb-env">CMDB / Software Asset Management</span>
+        <h1>Applications</h1>
+        <p class="text-sm text-slate-500 mt-1">Inventoriez et qualifiez le niveau de criticité des applications métiers.</p>
       </div>
 
-      <button
-          @click="openCreateModal"
-        class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm px-4 py-2.5 rounded-xl transition-all duration-150 shadow-sm"
-      >
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Ajouter un utilisateur
+      <button v-if="role === 'Admin'" @click="openCreateModal" class="btn-primary flex items-center gap-2">
+        <span>+</span> Ajouter une application
       </button>
     </div>
 
-    <!-- Alerte d'erreur -->
-    <div v-if="error" class="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-sm flex items-center gap-2">
-      <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-      {{ error }}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-muted flex items-center justify-center text-base w-11 h-11">💻</div>
+        <div>
+          <div class="kc-lbl text-xs">Applications Recensées</div>
+          <div class="kc-val text-xl font-bold mt-0.5">{{ stats.total }}</div>
+        </div>
+      </div>
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-danger flex items-center justify-center text-base w-11 h-11">🔥</div>
+        <div>
+          <div class="kc-lbl text-xs">Services Critiques (P1)</div>
+          <div class="kc-val text-xl font-bold mt-0.5" style="color: #f43f5e;">{{ stats.p1 }}</div>
+        </div>
+      </div>
+      <div class="kc flex items-center gap-4">
+        <div class="kc-ico ico-brand flex items-center justify-center text-base w-11 h-11">🌐</div>
+        <div>
+          <div class="kc-lbl text-xs">Déployées en Production</div>
+          <div class="kc-val text-xl font-bold mt-0.5" style="color: var(--brand-light)">{{ stats.production }}</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Table d'utilisateurs Premium -->
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full border-collapse text-left">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50/70">
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Nom</th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Adresse Email</th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Sites</th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Services</th>
-              <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Rôle</th>
-            </tr>
-          </thead>
-
-          <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
-            <tr v-for="user in users" :key="user.ID" class="hover:bg-slate-50/40 transition-colors group">
-              <!-- Colonne Nom avec un léger accent gras -->
-              <td class="p-4 font-medium text-slate-900">{{ user.name }}</td>
-              <td class="p-4 text-slate-500">{{ user.email }}</td>
-              <td class="p-4 text-slate-500">{{ user.site?.name || "-" }}</td>
-              <td class="p-4 text-slate-500">{{ user.service?.name || "-" }}</td>
-              <td class="p-4">
-                <span :class="getRoleBadgeClass(user.role)" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border">
-                  {{ user.role }}
-                </span>
-              </td>
-              <td class="flex gap-2">
-                <button
-                    @click="openEditModal(user)"
-                    class="text-blue-600 hover:text-blue-800"
-                >
-                  Modifier
-                </button>
-
-                <button
-                    @click="deleteUser(user)"
-                    class="text-red-600 hover:text-red-800"
-                >
-                  Supprimer
-                </button>
-              </td>
-            </tr>
-
-            <!-- État table vide -->
-            <tr v-if="users.length === 0">
-              <td colspan="3" class="p-12 text-center text-slate-400">
-                <svg class="w-8 h-8 text-slate-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                </svg>
-                Aucun utilisateur trouvé.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div class="fbar flex items-center justify-between gap-4 flex-wrap mb-6">
+      <div class="search-wrap flex-1 relative">
+        <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Rechercher par nom d'application, trigramme code, site d'hébergement..."
+            class="search-input w-full pl-4 pr-10 py-2.5"
+        />
+        <span class="absolute right-4 top-3 text-sm">🔍</span>
       </div>
+
+      <select v-model="filterCriticity" class="field-input w-52">
+        <option value="all">Toutes les criticités</option>
+        <option v-for="crit in criticityOptions" :key="crit" :value="crit">Criticité {{ crit }}</option>
+      </select>
+    </div>
+
+    <div v-if="error" class="modal-error error-bar mb-6 flex items-center gap-2">
+      <span>⚠️</span> {{ error }}
+    </div>
+
+    <div class="table-card overflow-hidden cmdb-dt-wrapper">
+      <DataTable
+          :data="filteredApplications"
+          :columns="columns"
+          class="w-full text-left border-collapse"
+          :options="dtOptions"
+      >
+        <template #column-name="{ cellData }">
+          <div class="font-medium" style="color: var(--tx-primary)">{{ cellData }}</div>
+        </template>
+
+        <template #column-code="{ cellData }">
+          <span class="px-2 py-0.5 font-mono text-xs rounded border" style="background: var(--bg-base); border-color: var(--bd-subtle); color: var(--tx-muted)">
+            {{ cellData || '—' }}
+          </span>
+        </template>
+
+        <template #column-criticity="{ cellData }">
+          <span :class="['sc-bdg text-xs px-2.5 py-0.5 rounded-full border', criticityConfig[cellData]?.class || 'bdg-sl']">
+            {{ criticityConfig[cellData]?.label || cellData }}
+          </span>
+        </template>
+
+        <template #column-environment="{ cellData }">
+          <span :class="['pill text-xs font-medium px-2.5 py-0.5 rounded-full border', environmentConfig[cellData]?.class || 'p-sl']">
+            {{ environmentConfig[cellData]?.label || cellData }}
+          </span>
+        </template>
+
+        <template #column-5="{ rowData }">
+          <div class="flex justify-end gap-1.5">
+            <button
+                v-if="role === 'Admin'"
+                class="action-btn action-edit text-xs"
+                title="Ajuster l'application"
+                @click="openEditModal(rowData)"
+            >✏️</button>
+            <button
+                v-if="role === 'Admin'"
+                class="action-btn action-delete text-xs"
+                title="Retirer du catalogue informatique"
+                @click="deleteApplication(rowData)"
+            >🗑️</button>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </DashboardLayout>
 
-  <!-- Modale Royale (Overlay fixe avec flou d'arrière-plan) -->
-  <div
-    v-if="showModal"
-    class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn"
-  >
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-      <!-- Header de la modale -->
-      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-900">Ajouter un collaborateur</h2>
-        <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-50 transition-colors">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
+  <Teleport to="body">
+    <div v-if="showModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 z-50" @click.self="showModal = false">
+      <div class="modal rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
 
-      <!-- Formulaire natif -->
-      <form @submit.prevent="saveUser">
-        <div class="p-6 space-y-4">
+        <div class="modal-header p-5 flex justify-between items-center border-b" style="border-color: var(--bd-subtle)">
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nom complet</label>
-            <input v-model="form.name" required placeholder="Ex: Jean Dupont" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/40 focus:bg-white" />
+            <span class="modal-eyebrow text-xs font-bold uppercase tracking-wider block mb-0.5" style="color: var(--brand-light)">Registre Logiciel</span>
+            <h2 class="modal-title text-lg font-semibold m-0">
+              {{ isEditMode ? "Modifier la fiche applicative" : "Enregistrer une nouvelle application" }}
+            </h2>
           </div>
+          <button @click="showModal = false" class="modal-close p-2">✕</button>
+        </div>
 
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Adresse Email</label>
-            <input v-model="form.email" type="email" required placeholder="j.dupont@entreprise.com" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/40 focus:bg-white" />
-          </div>
+        <form @submit.prevent="saveApplication">
+          <div class="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
 
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Mot de passe temporaire</label>
-            <input
-                v-model="form.password"
-                type="password"
-                :required="!isEditMode"
-                placeholder="Laisser vide pour conserver le mot de passe"
-                class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
-            />
-          </div>
-          <select v-model="form.site_id" required>
-            <option value="">Sélectionner un site</option>
-            <option v-for="site in sites" :key="site.ID" :value="site.ID">
-              {{ site.name }}
-            </option>
-          </select>
-          <select v-model="form.service_id">
-            <option value="">Aucun service</option>
-            <option v-for="service in services" :key="service.ID" :value="service.ID">
-              {{ service.name }}
-            </option>
-          </select>
+            <div class="grid grid-cols-3 gap-4">
+              <div class="col-span-2 flex flex-col gap-1.5">
+                <label class="text-xs font-medium">Nom de l'application <span style="color: #f43f5e;">*</span></label>
+                <input v-model="form.name" required type="text" class="field-input w-full" placeholder="Ex: Active Directory Auth" />
+              </div>
 
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Rôle & Permissions</label>
-            <div class="relative">
-              <select v-model="form.role" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50/40 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-50 transition-all appearance-none cursor-pointer text-slate-700">
-                <option value="Admin">Admin</option>
-                <option value="Agent">Agent</option>
-                <option value="Requester">Requester</option>
-              </select>
-              <!-- Petite flèche personnalisée pour remplacer le sélecteur natif moche -->
-              <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium">Code (Trigramme) <span style="color: #f43f5e;">*</span></label>
+                <input v-model="form.code" required type="text" class="field-input w-full font-mono uppercase" placeholder="Ex: ADA" maxLength="5" />
               </div>
             </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium">Seuil de criticité SLA <span style="color: #f43f5e;">*</span></label>
+                <select v-model="form.criticity" required class="field-input w-full appearance-none cursor-pointer">
+                  <option value="P1">P1 - Interruption Critique (Bloquant)</option>
+                  <option value="P2">P2 - Incident Majeur (Dégradé)</option>
+                  <option value="P3">P3 - Impact Moyen (Standard)</option>
+                  <option value="P4">P4 - Demande Mineure (Consultatif)</option>
+                </select>
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium">Scope d'environnement <span style="color: #f43f5e;">*</span></label>
+                <select v-model="form.environment" required class="field-input w-full appearance-none cursor-pointer">
+                  <option v-for="env in environmentOptions" :key="env" :value="env">{{ env }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-medium">Site ou Cluster d'hébergement principal</label>
+              <select v-model="form.site_id" class="field-input w-full appearance-none cursor-pointer">
+                <option value="">Sélectionner un site physique</option>
+                <option v-for="site in sites" :key="site.ID" :value="site.ID">{{ site.name }}</option>
+              </select>
+            </div>
+
           </div>
-        </div>
 
-        <!-- Footer actions de la modale -->
-        <div class="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
-          <button
-            type="button"
-            @click="showModal = false"
-            class="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 font-medium text-sm rounded-xl transition-colors"
-          >
-            Annuler
-          </button>
-
-          <button
-            type="submit"
-            :disabled="isSubmitting"
-            class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 font-medium text-sm rounded-xl transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
-          >
-            <span v-if="isSubmitting" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            <span>Créer le compte</span>
-          </button>
-        </div>
-      </form>
+          <div class="modal-footer p-4 flex justify-end gap-3 border-t" style="border-color: var(--bd-subtle); background: rgba(0,0,0,0.05)">
+            <button type="button" class="btn-ghost" @click="showModal = false">Annuler</button>
+            <button type="submit" :disabled="isSubmitting" class="btn-primary min-w-[120px]">
+              <span v-if="isSubmitting" class="inline-block spinner w-4 h-4 rounded-full border-2 animate-spin mr-2" style="vertical-align: sub;"></span>
+              {{ isEditMode ? "Mettre à jour" : "Déployer la fiche" }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.btn-primary, .btn-ghost {
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all var(--t-fast);
 }
-.animate-fadeIn {
-  animation: fadeIn 0.15s ease-out forwards;
+
+.action-btn {
+  padding: 6px 10px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.error-bar {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid;
+  font-size: 14px;
+}
+
+.modal-header, .modal-footer {
+  border-style: solid;
+}
+
+.pulse-slow {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.spinner {
+  border-color: transparent;
+  border-top-color: #fff;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+</style>
+
+<style>
+/* Encapsulation globale DataTables partagée sur l'UI system dark */
+.cmdb-dt-wrapper table.dataTable {
+  border-collapse: collapse !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable thead th {
+  background: rgba(0,0,0,0.15) !important;
+  color: var(--tx-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid var(--bd-subtle) !important;
+  padding: 12px 16px !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody td {
+  padding: 14px 16px !important;
+  border-bottom: 1px solid var(--bd-subtle) !important;
+  background: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody tr {
+  background-color: transparent !important;
+}
+
+.cmdb-dt-wrapper table.dataTable tbody tr:hover td {
+  background-color: rgba(255, 255, 255, 0.01) !important;
+}
+
+.dt-footer {
+  border-top: 1px solid var(--bd-subtle);
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--tx-muted);
+  font-size: 12px;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+  background: var(--bg-base) !important;
+  border: 1px solid var(--bd-subtle) !important;
+  color: var(--tx-secondary) !important;
+  border-radius: var(--r-sm) !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: var(--brand) !important;
+  color: white !important;
+  border-color: var(--brand) !important;
 }
 </style>

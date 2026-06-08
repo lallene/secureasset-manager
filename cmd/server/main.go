@@ -44,6 +44,7 @@ func main() {
 		&cmdb.Application{},
 		&cmdb.Database{},
 		&cmdb.ConfigurationRelation{},
+		&cmdb.BusinessService{},
 	); err != nil {
 		panic("Erreur migration : " + err.Error())
 	}
@@ -381,6 +382,37 @@ func main() {
 		middleware.JWTAuthMiddleware(),
 		middleware.RequireRole("Admin"),
 		cmdb.DeleteRelation,
+	)
+
+	router.GET(
+		"/cmdb/impact/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetAssetImpact,
+	)
+
+	router.GET("/cmdb/business-services",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		cmdb.GetBusinessServices,
+	)
+
+	router.POST("/cmdb/business-services",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.CreateBusinessService,
+	)
+
+	router.PUT("/cmdb/business-services/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.UpdateBusinessService,
+	)
+
+	router.DELETE("/cmdb/business-services/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		cmdb.DeleteBusinessService,
 	)
 
 	router.GET("/ws", ws.HandleWS)

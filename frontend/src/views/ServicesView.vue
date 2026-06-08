@@ -101,53 +101,61 @@ onMounted(fetchServices);
 
 <template>
   <DashboardLayout>
-    <div class="flex items-center justify-between mb-8">
+    <!-- Topbar Header -->
+    <div class="topbar flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-slate-900">Services</h1>
-        <p class="text-sm text-slate-500 mt-1">
-          Gérez les services responsables du traitement des tickets.
-        </p>
+        <h1>Services</h1>
+        <p>Gérez les services responsables du traitement des tickets.</p>
       </div>
 
-      <button
-          @click="openCreateModal"
-          class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-medium"
-      >
-        Ajouter un service
+      <button @click="openCreateModal" class="btn-primary flex items-center gap-2">
+        <span>+</span> Ajouter un service
       </button>
     </div>
 
-    <div v-if="error" class="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-xl text-sm">
+    <!-- Alert Bar -->
+    <div v-if="error" class="modal-error error-bar mb-6">
       {{ error }}
     </div>
 
-    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <table class="w-full text-left">
-        <thead class="bg-slate-50 border-b border-slate-100">
+    <!-- Main Table Container -->
+    <div class="table-card overflow-hidden">
+      <table class="w-full text-left border-collapse">
+        <thead>
         <tr>
-          <th class="p-4 text-xs uppercase text-slate-400">Nom</th>
-          <th class="p-4 text-xs uppercase text-slate-400">Description</th>
-          <th class="p-4 text-xs uppercase text-slate-400 text-right">Actions</th>
+          <th class="p-4 text-xs font-semibold uppercase tracking-wider">Nom</th>
+          <th class="p-4 text-xs font-semibold uppercase tracking-wider">Description</th>
+          <th class="p-4 text-xs font-semibold uppercase tracking-wider text-right">Actions</th>
         </tr>
         </thead>
 
-        <tbody class="divide-y divide-slate-100">
-        <tr v-for="service in services" :key="service.ID" class="hover:bg-slate-50">
-          <td class="p-4 font-medium text-slate-900">{{ service.name }}</td>
-          <td class="p-4 text-slate-500">{{ service.description || "-" }}</td>
+        <tbody>
+        <tr v-for="service in services" :key="service.ID">
+          <td class="p-4 font-medium" style="color: var(--tx-primary);">
+            {{ service.name }}
+          </td>
+          <td class="p-4">
+            {{ service.description || "-" }}
+          </td>
           <td class="p-4 text-right">
-            <button @click="openEditModal(service)" class="text-blue-600 hover:underline mr-4">
-              Modifier
-            </button>
-            <button @click="deleteService(service)" class="text-red-600 hover:underline">
-              Supprimer
-            </button>
+            <div class="flex justify-end gap-2">
+              <button @click="openEditModal(service)" class="action-btn action-edit">
+                Modifier
+              </button>
+              <button @click="deleteService(service)" class="action-btn action-delete">
+                Supprimer
+              </button>
+            </div>
           </td>
         </tr>
 
+        <!-- Empty State intégré aux standards de ton CSS -->
         <tr v-if="services.length === 0">
-          <td colspan="3" class="p-10 text-center text-slate-400">
-            Aucun service trouvé.
+          <td colspan="3" class="p-12 text-center">
+            <div class="flex flex-col items-center justify-center gap-2">
+              <div class="empty-title font-medium text-base">Aucun service trouvé</div>
+              <div class="empty-sub text-sm">Commencez par ajouter un nouveau service à la liste.</div>
+            </div>
           </td>
         </tr>
         </tbody>
@@ -155,24 +163,49 @@ onMounted(fetchServices);
     </div>
   </DashboardLayout>
 
-  <div v-if="showModal" class="fixed inset-0 bg-slate-950/40 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-      <div class="p-6 border-b border-slate-100 flex justify-between">
-        <h2 class="text-lg font-semibold">
-          {{ isEditMode ? "Modifier le service" : "Ajouter un service" }}
-        </h2>
-        <button @click="showModal = false">✕</button>
+  <!-- Modal Component -->
+  <div v-if="showModal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4 z-50">
+    <div class="modal rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+
+      <div class="modal-header p-5 flex justify-between items-center border-b">
+        <div>
+          <span class="modal-eyebrow text-xs font-bold uppercase tracking-wider block mb-1">Configuration</span>
+          <h2 class="modal-title text-lg font-semibold m-0">
+            {{ isEditMode ? "Modifier le service" : "Ajouter un service" }}
+          </h2>
+        </div>
+        <button @click="showModal = false" class="modal-close p-2 rounded-lg transition-colors">
+          ✕
+        </button>
       </div>
 
-      <form @submit.prevent="saveService" class="p-6 space-y-4">
-        <input v-model="form.name" required placeholder="Nom du service" class="input" />
-        <textarea v-model="form.description" placeholder="Description" class="input"></textarea>
+      <form @submit.prevent="saveService" class="p-6 space-y-5">
+        <div class="flex flex-col gap-1.5">
+          <label class="field-label text-xs font-medium">Nom du service</label>
+          <input
+              v-model="form.name"
+              required
+              placeholder="Ex: Support Technique, Facturation..."
+              class="field-input w-full"
+          />
+        </div>
 
-        <div class="flex justify-end gap-3 pt-4">
-          <button type="button" @click="showModal = false" class="btn-secondary">
+        <div class="flex flex-col gap-1.5">
+          <label class="field-label text-xs font-medium">Description</label>
+          <textarea
+              v-model="form.description"
+              placeholder="Décrivez brièvement le périmètre de ce service..."
+              rows="4"
+              class="field-input w-full resize-none"
+          ></textarea>
+        </div>
+
+        <div class="modal-footer -mx-6 -mb-6 p-4 mt-6 flex justify-end gap-3 border-t">
+          <button type="button" @click="showModal = false" class="btn-ghost">
             Annuler
           </button>
-          <button type="submit" :disabled="isSubmitting" class="btn-primary">
+          <button type="submit" :disabled="isSubmitting" class="btn-primary min-w-[100px]">
+            <span v-if="isSubmitting" class="inline-block animate-spin mr-2">✦</span>
             {{ isEditMode ? "Enregistrer" : "Créer" }}
           </button>
         </div>
@@ -182,22 +215,47 @@ onMounted(fetchServices);
 </template>
 
 <style scoped>
-.input {
-  width: 100%;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px 12px;
+/* Alignement et ajustements spécifiques au layout des boutons internes */
+.btn-primary {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+.btn-ghost {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+/* Boutons d'action en bout de ligne */
+.action-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+/* Styles pour la barre d'erreur */
+.error-bar {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid;
   font-size: 14px;
 }
-.btn-primary {
-  background: #0f172a;
-  color: white;
-  padding: 9px 16px;
-  border-radius: 12px;
-}
-.btn-secondary {
-  border: 1px solid #e2e8f0;
-  padding: 9px 16px;
-  border-radius: 12px;
+
+/* Modal header/footer tweaks */
+.modal-header,
+.modal-footer {
+  border-style: solid;
 }
 </style>
