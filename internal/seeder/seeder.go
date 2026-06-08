@@ -8,6 +8,7 @@ import (
 
 	"secureasset-manager/internal/asset"
 	"secureasset-manager/internal/auth"
+	"secureasset-manager/internal/change"
 	"secureasset-manager/internal/cmdb"
 	"secureasset-manager/internal/database"
 	"secureasset-manager/internal/incident"
@@ -29,11 +30,10 @@ func Seed() {
 		return
 	}
 
-	log.Println("Seeder démo ITSM + CMDB : génération des données...")
+	log.Println("Seeder démo ITSM + CMDB + Change Management : génération des données...")
 
 	password, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 
-	// Sites
 	sites := []site.Site{
 		{Name: "Paris HQ", City: "Paris", Country: "France", Description: "Siège principal"},
 		{Name: "Lyon Support Center", City: "Lyon", Country: "France", Description: "Centre support IT"},
@@ -44,10 +44,8 @@ func Seed() {
 		{Name: "Datacenter Paris", City: "Paris", Country: "France", Description: "Infrastructure production"},
 		{Name: "Datacenter Lyon", City: "Lyon", Country: "France", Description: "Infrastructure PRA"},
 	}
-
 	database.DB.Create(&sites)
 
-	// Services
 	services := []service.Service{
 		{Name: "Réseau", Description: "LAN, WAN, VPN, Wi-Fi"},
 		{Name: "Systèmes", Description: "Windows Server, Linux, AD, GPO"},
@@ -58,10 +56,8 @@ func Seed() {
 		{Name: "Database", Description: "PostgreSQL, MySQL, sauvegardes"},
 		{Name: "Téléphonie", Description: "VoIP, softphones, centres d'appels"},
 	}
-
 	database.DB.Create(&services)
 
-	// Users
 	var users []auth.User
 
 	for i := 1; i <= 4; i++ {
@@ -99,9 +95,7 @@ func Seed() {
 
 	database.DB.CreateInBatches(&users, 200)
 
-	// Assets
 	var assets []asset.Asset
-
 	assetTypes := []string{"Laptop", "Desktop", "Server", "Printer", "Switch", "Router", "Firewall", "NAS", "Access Point"}
 	assetStatuses := []string{"Active", "Active", "Active", "Maintenance", "Retired"}
 
@@ -119,7 +113,6 @@ func Seed() {
 
 	database.DB.CreateInBatches(&assets, 500)
 
-	// CMDB Applications
 	applications := []cmdb.Application{
 		{Name: "SecureAsset Manager", Description: "Plateforme ITSM et CMDB interne", Version: "2.0.0", Criticality: "High", Status: "Active", SiteID: 7},
 		{Name: "CRM Support", Description: "CRM utilisé par les équipes support client", Version: "4.8.0", Criticality: "Critical", Status: "Active", SiteID: 2},
@@ -140,57 +133,18 @@ func Seed() {
 		{Name: "Data Warehouse", Description: "Reporting BI et extraction données", Version: "10.2.0", Criticality: "High", Status: "Active", SiteID: 7},
 		{Name: "Visitor Management", Description: "Gestion des visiteurs", Version: "1.1.0", Criticality: "Low", Status: "Retired", SiteID: 1},
 	}
-
 	database.DB.Create(&applications)
 
 	businessServices := []cmdb.BusinessService{
-		{
-			Name:        "Service ITSM",
-			Description: "Gestion incidents, assets et CMDB",
-			Criticality: "Critical",
-			Status:      "Active",
-			SiteID:      1,
-		},
-		{
-			Name:        "Support Client",
-			Description: "Support utilisateurs et CRM",
-			Criticality: "Critical",
-			Status:      "Active",
-			SiteID:      2,
-		},
-		{
-			Name:        "Finance & Facturation",
-			Description: "ERP financier",
-			Criticality: "Critical",
-			Status:      "Active",
-			SiteID:      1,
-		},
-		{
-			Name:        "Cyber Security Operations",
-			Description: "SOC, IAM, EDR",
-			Criticality: "Critical",
-			Status:      "Active",
-			SiteID:      6,
-		},
-		{
-			Name:        "Infrastructure & Monitoring",
-			Description: "Datacenters et supervision",
-			Criticality: "High",
-			Status:      "Active",
-			SiteID:      7,
-		},
-		{
-			Name:        "Digital Workplace",
-			Description: "M365, VPN, postes utilisateurs",
-			Criticality: "High",
-			Status:      "Active",
-			SiteID:      1,
-		},
+		{Name: "Service ITSM", Description: "Gestion incidents, assets et CMDB", Criticality: "Critical", Status: "Active", SiteID: 1},
+		{Name: "Support Client", Description: "Support utilisateurs et CRM", Criticality: "Critical", Status: "Active", SiteID: 2},
+		{Name: "Finance & Facturation", Description: "ERP financier", Criticality: "Critical", Status: "Active", SiteID: 1},
+		{Name: "Cyber Security Operations", Description: "SOC, IAM, EDR", Criticality: "Critical", Status: "Active", SiteID: 6},
+		{Name: "Infrastructure & Monitoring", Description: "Datacenters et supervision", Criticality: "High", Status: "Active", SiteID: 7},
+		{Name: "Digital Workplace", Description: "M365, VPN, postes utilisateurs", Criticality: "High", Status: "Active", SiteID: 1},
 	}
-
 	database.DB.Create(&businessServices)
 
-	// CMDB Databases
 	databases := []cmdb.Database{
 		{Name: "secureasset_prod", Engine: "PostgreSQL", Version: "16", Environment: "Production", SiteID: 7},
 		{Name: "secureasset_pra", Engine: "PostgreSQL", Version: "16", Environment: "Preproduction", SiteID: 8},
@@ -207,10 +161,8 @@ func Seed() {
 		{Name: "devops_registry", Engine: "Redis", Version: "7", Environment: "Production", SiteID: 5},
 		{Name: "bi_warehouse", Engine: "PostgreSQL", Version: "16", Environment: "Production", SiteID: 7},
 	}
-
 	database.DB.Create(&databases)
 
-	// CMDB Relations
 	var relations []cmdb.ConfigurationRelation
 
 	for i := 1; i <= len(applications); i++ {
@@ -246,58 +198,52 @@ func Seed() {
 	}
 
 	relations = append(relations,
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     1,
-			TargetType:   "Application",
-			TargetID:     1,
-			RelationType: "depends_on",
-		},
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     2,
-			TargetType:   "Application",
-			TargetID:     2,
-			RelationType: "depends_on",
-		},
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     3,
-			TargetType:   "Application",
-			TargetID:     8,
-			RelationType: "depends_on",
-		},
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     4,
-			TargetType:   "Application",
-			TargetID:     5,
-			RelationType: "depends_on",
-		},
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     4,
-			TargetType:   "Application",
-			TargetID:     11,
-			RelationType: "depends_on",
-		},
-
-		cmdb.ConfigurationRelation{
-			SourceType:   "BusinessService",
-			SourceID:     5,
-			TargetType:   "Application",
-			TargetID:     4,
-			RelationType: "depends_on",
-		},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 1, TargetType: "Application", TargetID: 1, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 2, TargetType: "Application", TargetID: 2, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 3, TargetType: "Application", TargetID: 8, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 4, TargetType: "Application", TargetID: 5, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 4, TargetType: "Application", TargetID: 11, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 5, TargetType: "Application", TargetID: 4, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 6, TargetType: "Application", TargetID: 10, RelationType: "depends_on"},
+		cmdb.ConfigurationRelation{SourceType: "BusinessService", SourceID: 6, TargetType: "Application", TargetID: 13, RelationType: "depends_on"},
 	)
 	database.DB.Create(&relations)
 
-	// Incidents
+	var changes []change.ChangeRequest
+
+	changeStatuses := []string{"Draft", "Submitted", "Approved", "Implemented", "Closed", "Rejected"}
+	changeRisks := []string{"Low", "Medium", "High", "Critical"}
+	changeTypes := []string{"Standard", "Normal", "Emergency"}
+
+	for i := 1; i <= 250; i++ {
+		status := changeStatuses[rand.Intn(len(changeStatuses))]
+		bsID := uint(rand.Intn(len(businessServices)) + 1)
+
+		start := time.Now().AddDate(0, 0, rand.Intn(120)-60)
+		end := start.Add(time.Duration(rand.Intn(8)+1) * time.Hour)
+
+		changeItem := change.ChangeRequest{
+			Title:             fmt.Sprintf("Change %03d - %s", i, randomChangeTitle()),
+			Description:       randomChangeDescription(),
+			Type:              changeTypes[rand.Intn(len(changeTypes))],
+			Risk:              changeRisks[rand.Intn(len(changeRisks))],
+			Status:            status,
+			PlannedStart:      &start,
+			PlannedEnd:        &end,
+			RollbackPlan:      "Rollback snapshot, restauration service et validation monitoring.",
+			BusinessServiceID: &bsID,
+		}
+
+		changes = append(changes, changeItem)
+	}
+
+	database.DB.CreateInBatches(&changes, 100)
+
+	for i := range changes {
+		changes[i].Reference = fmt.Sprintf("CHG-%06d", changes[i].ID)
+		database.DB.Save(&changes[i])
+	}
+
 	incidentTypes := []string{"Software", "Hardware", "Network", "Security", "Infrastructure", "Access", "Database", "Cloud"}
 	priorities := []string{"Low", "Medium", "High", "Critical"}
 	incidentStatuses := []string{"Open", "In Progress", "Resolved", "Closed"}
@@ -340,29 +286,25 @@ func Seed() {
 				CreatedAt: createdAt,
 				UpdatedAt: updatedAt,
 			},
-
-			Title:       randomIncidentTitle(i),
-			Description: randomIncidentDescription(),
-			Type:        incidentTypes[rand.Intn(len(incidentTypes))],
-			Priority:    priority,
-			Status:      status,
-
-			AssetID: uint(rand.Intn(1200) + 1),
-
+			Title:        randomIncidentTitle(i),
+			Description:  randomIncidentDescription(),
+			Type:         incidentTypes[rand.Intn(len(incidentTypes))],
+			Priority:     priority,
+			Status:       status,
+			AssetID:      uint(rand.Intn(1200) + 1),
 			SiteID:       randomID(len(sites)),
 			ServiceID:    randomID(len(services)),
 			CreatedByID:  requesterID,
 			AssignedToID: assignedToID,
-
-			DueAt:      &dueAt,
-			ResolvedAt: resolvedAt,
-			ClosedAt:   closedAt,
+			DueAt:        &dueAt,
+			ResolvedAt:   resolvedAt,
+			ClosedAt:     closedAt,
 		})
 	}
 
 	database.DB.CreateInBatches(&incidents, 500)
 
-	log.Println("Seeder terminé : 8 sites, 8 services, 104 users, 1200 assets, 18 applications, 14 databases, 51 relations CMDB, 20000 incidents")
+	log.Println("Seeder terminé : 8 sites, 8 services, 104 users, 1200 assets, 18 applications, 14 databases, 53 relations CMDB, 250 changes, 20000 incidents")
 }
 
 func randomID(max int) uint {
@@ -402,7 +344,6 @@ func randomIncidentTitle(i int) string {
 		"Suspicion phishing utilisateur",
 		"Déploiement applicatif échoué",
 	}
-
 	return fmt.Sprintf("%s #%05d", titles[rand.Intn(len(titles))], i)
 }
 
@@ -414,6 +355,36 @@ func randomIncidentDescription() string {
 		"Une action corrective est attendue par l'équipe assignée.",
 		"Les premiers éléments indiquent une indisponibilité partielle.",
 	}
+	return descriptions[rand.Intn(len(descriptions))]
+}
 
+func randomChangeTitle() string {
+	titles := []string{
+		"Migration PostgreSQL 16 vers 17",
+		"Upgrade Windows Server",
+		"Déploiement CrowdStrike",
+		"Rotation certificats SSL",
+		"Migration Azure AD",
+		"Déploiement MFA",
+		"Upgrade Firewall Palo Alto",
+		"Migration VPN",
+		"Déploiement nouvelle version CRM",
+		"Patch sécurité critique",
+		"Migration base de données finance",
+		"Upgrade cluster Kubernetes",
+		"Refonte politique GPO",
+		"Déploiement nouveau portail utilisateur",
+	}
+	return titles[rand.Intn(len(titles))]
+}
+
+func randomChangeDescription() string {
+	descriptions := []string{
+		"Changement planifié dans le cadre de la maintenance préventive.",
+		"Changement soumis au CAB pour validation et analyse d'impact.",
+		"Montée de version nécessaire pour sécurité, performance et conformité.",
+		"Modification technique avec plan de rollback documenté.",
+		"Action prévue pour réduire la dette technique et améliorer la disponibilité.",
+	}
 	return descriptions[rand.Intn(len(descriptions))]
 }

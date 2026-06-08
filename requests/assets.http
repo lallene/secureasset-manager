@@ -1,7 +1,2 @@
-###
-# curl -X GET http://localhost:8080/cmdb/impact/1
-#  -H "Authorization: Bearer TON_TOKEN_ICI"
-GET http://localhost:8080/cmdb/impact/936
+PUT http://localhost:8080/changes/1/close
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluMUB0ZXN0LmNvbSIsImV4cCI6MTc4MTAxMTIzMywicm9sZSI6IkFkbWluIiwidXNlcl9pZCI6MX0.ZtZY0TZUo_9OA-Ibu6HCMMg9_GAcfgKiTCO45lgUsOI
-
-###

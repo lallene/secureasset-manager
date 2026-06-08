@@ -171,6 +171,25 @@ const logout = () => {
           </svg>
           <span class="text-sm">Relations</span>
         </router-link>
+        <router-link
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            to="/cmdb/graph"
+            active-class="bg-slate-900 text-white font-medium"
+            class="flex items-center gap-3 text-slate-400 hover:text-slate-100 hover:bg-slate-900/50 px-3 py-2.5 rounded-xl transition-all duration-150 group"
+        >
+          <svg class="w-4 h-4 text-slate-400 group-hover:text-slate-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6.75A2.25 2.25 0 118.25 9 2.25 2.25 0 016 6.75zm9.75 0A2.25 2.25 0 1118 9a2.25 2.25 0 01-2.25-2.25zM6 17.25A2.25 2.25 0 118.25 19.5 2.25 2.25 0 016 17.25zm9.75 0A2.25 2.25 0 1118 19.5a2.25 2.25 0 01-2.25-2.25zM8.25 9l7.5 6M15.75 9l-7.5 6" />
+          </svg>
+          <span class="text-sm">CMDB Graph</span>
+        </router-link>
+        <router-link
+            v-if="role === 'Admin' || role === 'Agent' || role === 'Requester'"
+            to="/changes"
+            active-class="bg-slate-900 text-white font-medium"
+            class="flex items-center gap-3 text-slate-400 hover:text-slate-100 hover:bg-slate-900/50 px-3 py-2.5 rounded-xl transition-all duration-150 group"
+        >
+          <span class="text-sm">Change Management</span>
+        </router-link>
 
         <div
             v-if="role === 'Admin'"

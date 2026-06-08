@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"secureasset-manager/internal/change"
 	"secureasset-manager/internal/cmdb"
 
 	_ "secureasset-manager/docs"
@@ -44,7 +45,7 @@ func main() {
 		&cmdb.Application{},
 		&cmdb.Database{},
 		&cmdb.ConfigurationRelation{},
-		&cmdb.BusinessService{},
+		&change.ChangeRequest{},
 	); err != nil {
 		panic("Erreur migration : " + err.Error())
 	}
@@ -414,6 +415,52 @@ func main() {
 		middleware.RequireRole("Admin"),
 		cmdb.DeleteBusinessService,
 	)
+	router.GET(
+		"/cmdb/graph",
+		middleware.JWTAuthMiddleware(),
+		cmdb.GetGraphHandler,
+	)
+
+	router.GET(
+		"/changes",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		change.GetChanges,
+	)
+
+	router.POST(
+		"/changes",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent"),
+		change.CreateChange,
+	)
+
+	router.PUT(
+		"/changes/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent"),
+		change.UpdateChange,
+	)
+
+	router.DELETE(
+		"/changes/:id",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin"),
+		change.DeleteChange,
+	)
+
+	router.GET(
+		"/changes/:id/impact",
+		middleware.JWTAuthMiddleware(),
+		middleware.RequireRole("Admin", "Agent", "Requester"),
+		change.GetChangeImpact,
+	)
+
+	router.PUT("/changes/:id/submit", middleware.JWTAuthMiddleware(), middleware.RequireRole("Admin", "Agent"), change.SubmitChange)
+	router.PUT("/changes/:id/approve", middleware.JWTAuthMiddleware(), middleware.RequireRole("Admin"), change.ApproveChange)
+	router.PUT("/changes/:id/reject", middleware.JWTAuthMiddleware(), middleware.RequireRole("Admin"), change.RejectChange)
+	router.PUT("/changes/:id/implement", middleware.JWTAuthMiddleware(), middleware.RequireRole("Admin", "Agent"), change.ImplementChange)
+	router.PUT("/changes/:id/close", middleware.JWTAuthMiddleware(), middleware.RequireRole("Admin", "Agent"), change.CloseChange)
 
 	router.GET("/ws", ws.HandleWS)
 

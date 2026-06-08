@@ -11,10 +11,9 @@ import ServicesView from "../views/ServicesView.vue";
 import ApplicationsView from "../views/ApplicationsView.vue";
 import DatabasesView from "../views/DatabasesView.vue";
 import RelationsView from "../views/RelationsView.vue";
-
-
-
-
+import ChangesView from "../views/ChangesView.vue";
+import CmdbGraphView from "../views/CmdbGraphView.vue";
+import ChangeImpactView from "../views/ChangeImpactView.vue";
 
 const routes = [
     { path: "/", component: LoginView },
@@ -28,6 +27,11 @@ const routes = [
     { path: "/cmdb/applications", component: ApplicationsView },
     { path: "/cmdb/databases", component: DatabasesView },
     { path: "/cmdb/relations", component: RelationsView },
+    { path: "/cmdb/graph", component: CmdbGraphView },
+    { path: "/changes", component: ChangesView },
+    { path: "/changes/:id/impact", component: ChangeImpactView},
+    { path: "/changes/:id/impact", name: "change-impact", component: ChangeImpactView},
+
 ];
 
 const router = createRouter({
